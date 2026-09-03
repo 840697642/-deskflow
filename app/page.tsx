@@ -1,5 +1,5 @@
-import WorkbenchShell from '@/components/workbench-shell'
+import Workbench from '@/components/workbench'
 
 export default function Page() {
-  return <WorkbenchShell />
+  return <Workbench />
 }
