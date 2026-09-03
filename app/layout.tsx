@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Atlas Studio · 创意工作台',
+  title: 'NO.1 3mode · 今日焦点',
   description: '面向 AI 学习与开发者的创意工作流控制台。',
   generator: 'v0.app',
   icons: {
