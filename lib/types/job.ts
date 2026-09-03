@@ -6,12 +6,49 @@ export enum JobStatus {
   RUNNING = 'running',
   PAUSED = 'paused',
   WAITING = 'waiting',
-  WAITING_FOR_INPUT = 'waiting_for_input',
+  WAITING_INPUT = 'waiting_input',
   WAITING_FOR_DEPENDENCY = 'waiting_for_dependency',
+  WAITING_AUTH = 'waiting_auth',
   FAILED = 'failed',
   SUCCEEDED = 'succeeded',
   CANCELED = 'canceled',
   STALE = 'stale',
+}
+
+export type InputType = 'text' | 'select' | 'number' | 'file'
+
+export interface InputValidation {
+  required: boolean
+  minLength?: number
+  maxLength?: number
+  pattern?: string
+}
+
+export interface JobInputRequirement {
+  jobId: string
+  prompt: string
+  type: InputType
+  options?: string[]
+  placeholder?: string
+  defaultValue?: string
+  validation?: InputValidation
+}
+
+export interface JobInputMetadata {
+  inputRequired?: Omit<JobInputRequirement, 'jobId'>
+  userInput?: string
+}
+
+export interface JobAuthMetadata {
+  authRequired?: {
+    provider: string
+    requiredScopes: string[]
+    description: string
+  }
+  authCompleted?: {
+    provider: string
+    completedAt: string
+  }
 }
 
 export type JobAction = 'pause' | 'resume' | 'cancel' | 'retry'
@@ -33,9 +70,14 @@ export interface Job {
   errorId?: string
   canRetry: boolean
   logs: string[]
+  metadata?: JobInputMetadata & JobAuthMetadata
 }
 
 export interface JobControlRequest extends MutationMetadata {
   action: JobAction
   jobId?: string
+}
+
+export interface SubmitInputRequest extends MutationMetadata {
+  value: string
 }

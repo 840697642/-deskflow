@@ -6,7 +6,9 @@ import type {
   MutationMetadata,
   WorkbenchSummary,
 } from './types/common'
-import type { Job, JobAction, JobControlRequest, JobStatus } from './types/job'
+import type { AuthCallbackRequest, AuthCallbackResponse, AuthRequirement } from './types/auth'
+import type { KnowledgeDoc } from './types/knowledge-doc'
+import type { Job, JobAction, JobControlRequest, JobInputRequirement, JobStatus } from './types/job'
 import type { ModuleHealth, ModuleHealthStatus } from './types/module'
 import type {
   CreateTaskRequest,
@@ -74,6 +76,7 @@ export type MutationInput = Partial<MutationMetadata>
 
 export type CreateTaskInput = CreateTaskRequest
 export type UpdateTaskInput = UpdateTaskRequest
+export type KnowledgeDocQuery = { limit?: number; pinned?: boolean }
 
 type RequestInitWithBody = RequestInit & { body?: string }
 
@@ -265,6 +268,28 @@ export function retryJob(id: string, meta?: MutationInput, options?: ApiClientOp
   return sendJobAction(id, 'retry', meta, options)
 }
 
+export async function fetchInputRequirements(id: string, options?: ApiClientOptions): Promise<JobInputRequirement> {
+  return requestJson<JobInputRequirement>(`/api/jobs/${encodePathSegment(id)}/input-requirements`, {}, options)
+}
+
+export async function submitJobInput(id: string, value: string, meta?: MutationInput, options?: ApiClientOptions): Promise<Job> {
+  return requestJson<Job>(`/api/jobs/${encodePathSegment(id)}/input`, {
+    method: 'POST',
+    body: jsonBody(mutationBody({ value }, meta)),
+  }, options)
+}
+
+export async function fetchAuthRequirements(type: AuthRequirement['type'], id: string, options?: ApiClientOptions): Promise<AuthRequirement> {
+  return requestJson<AuthRequirement>(`/api/auth/requirements/${encodePathSegment(type)}/${encodePathSegment(id)}`, {}, options)
+}
+
+export async function submitAuthCallback(input: Omit<AuthCallbackRequest, keyof MutationMetadata>, meta?: MutationInput, options?: ApiClientOptions): Promise<AuthCallbackResponse> {
+  return requestJson<AuthCallbackResponse>('/api/auth/callback', {
+    method: 'POST',
+    body: jsonBody(mutationBody(input, meta)),
+  }, options)
+}
+
 export async function controlJob(id: string, action: JobControlRequest['action'], meta?: MutationInput, options?: ApiClientOptions): Promise<Job> {
   return requestJson<Job>(`/api/jobs/${encodePathSegment(id)}`, {
     method: 'PATCH',
@@ -303,6 +328,17 @@ export async function fetchArtifacts(limit?: number, options?: ApiClientOptions)
   return requestJson<Artifact[]>(`/api/artifacts${queryString({ limit: limit?.toString() })}`, {}, options)
 }
 
+export async function fetchKnowledgeDocs(params?: KnowledgeDocQuery, options?: ApiClientOptions): Promise<KnowledgeDoc[]> {
+  return requestJson<KnowledgeDoc[]>(`/api/knowledge/docs${queryString({ limit: params?.limit?.toString(), pinned: params?.pinned?.toString() })}`, {}, options)
+}
+
+export async function pinKnowledgeDoc(id: string, pinned: boolean, meta?: MutationInput, options?: ApiClientOptions): Promise<KnowledgeDoc> {
+  return requestJson<KnowledgeDoc>(`/api/knowledge/docs/${encodePathSegment(id)}/pin`, {
+    method: 'POST',
+    body: jsonBody(mutationBody({ pinned }, meta)),
+  }, options)
+}
+
 export async function fetchInspector(type: InspectorType, id: string, options?: ApiClientOptions): Promise<InspectorResponse> {
   return requestJson<InspectorResponse>(`/api/inspector/${encodePathSegment(type)}/${encodePathSegment(id)}`, {}, options)
 }
@@ -313,4 +349,4 @@ export const apiClientDefaults = {
   schemaVersion: API_SCHEMA_VERSION,
 } as const
 
-export type { Artifact, Conversation, Job, JobAction, JobStatus, ModuleHealth, ModuleHealthStatus, Task, TaskPriority, TaskStatus, WorkbenchSummary }
+export type { Artifact, AuthCallbackRequest, AuthCallbackResponse, AuthRequirement, Conversation, Job, JobAction, JobInputRequirement, JobStatus, KnowledgeDoc, ModuleHealth, ModuleHealthStatus, Task, TaskPriority, TaskStatus, WorkbenchSummary }

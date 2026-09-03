@@ -12,7 +12,8 @@ export const jobStateTransitions: Record<JobStatus, readonly JobStatus[]> = {
   ],
   [JobStatus.PAUSED]: [JobStatus.QUEUED, JobStatus.CANCELED],
   [JobStatus.WAITING]: [JobStatus.QUEUED, JobStatus.CANCELED],
-  [JobStatus.WAITING_FOR_INPUT]: [JobStatus.QUEUED, JobStatus.CANCELED],
+  [JobStatus.WAITING_INPUT]: [JobStatus.QUEUED, JobStatus.CANCELED],
+  [JobStatus.WAITING_AUTH]: [JobStatus.QUEUED, JobStatus.CANCELED],
   [JobStatus.WAITING_FOR_DEPENDENCY]: [JobStatus.QUEUED, JobStatus.CANCELED],
   [JobStatus.FAILED]: [JobStatus.QUEUED, JobStatus.CANCELED],
   [JobStatus.SUCCEEDED]: [],
@@ -33,7 +34,8 @@ export function getAvailableActions(status: JobStatus): JobAction[] {
     case JobStatus.QUEUED:
     case JobStatus.STARTING:
     case JobStatus.WAITING:
-    case JobStatus.WAITING_FOR_INPUT:
+    case JobStatus.WAITING_INPUT:
+    case JobStatus.WAITING_AUTH:
     case JobStatus.WAITING_FOR_DEPENDENCY:
       return ['cancel']
     case JobStatus.FAILED:
@@ -56,7 +58,8 @@ export function targetStatusForAction(job: Job, action: JobAction): JobStatus | 
       JobStatus.RUNNING,
       JobStatus.PAUSED,
       JobStatus.WAITING,
-      JobStatus.WAITING_FOR_INPUT,
+      JobStatus.WAITING_INPUT,
+      JobStatus.WAITING_AUTH,
       JobStatus.WAITING_FOR_DEPENDENCY,
       JobStatus.FAILED,
       JobStatus.STALE,

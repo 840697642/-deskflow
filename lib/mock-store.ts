@@ -3,10 +3,12 @@ import { mockConversations } from '@/lib/fixtures/conversations'
 import { mockJobs } from '@/lib/fixtures/jobs'
 import { mockModules } from '@/lib/fixtures/modules'
 import { mockTasks } from '@/lib/fixtures/tasks'
+import { mockKnowledgeDocs } from '@/lib/fixtures/knowledge-docs'
 import type { ApiSuccess, Artifact, Conversation } from '@/lib/types/common'
 import type { Job } from '@/lib/types/job'
 import type { ModuleHealth } from '@/lib/types/module'
 import type { Task } from '@/lib/types/task'
+import type { KnowledgeDoc } from '@/lib/types/knowledge-doc'
 
 export interface MutationRecord {
   status: number
@@ -19,6 +21,7 @@ export interface MockStore {
   modules: ModuleHealth[]
   conversations: Conversation[]
   artifacts: Artifact[]
+  knowledgeDocs: KnowledgeDoc[]
   mutations: Map<string, MutationRecord>
 }
 
@@ -31,6 +34,7 @@ function createStore(): MockStore {
     modules: mockModules.map((module) => ({ ...module })),
     conversations: mockConversations.map((conversation) => ({ ...conversation })),
     artifacts: mockArtifacts.map((artifact) => ({ ...artifact })),
+    knowledgeDocs: mockKnowledgeDocs.map((doc) => ({ ...doc, tags: doc.tags ? [...doc.tags] : undefined })),
     mutations: new Map(),
   }
 }

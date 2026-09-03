@@ -17,6 +17,17 @@ export interface ModuleHealth {
   canReconnect: boolean
   canStart: boolean
   errorMessage?: string
+  metadata?: {
+    authRequired?: {
+      provider: string
+      requiredScopes: string[]
+      description: string
+    }
+    authCompleted?: {
+      provider: string
+      completedAt: string
+    }
+  }
 }
 
 export interface ReconnectModuleRequest extends MutationMetadata {

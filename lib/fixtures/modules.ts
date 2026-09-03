@@ -56,4 +56,21 @@ export const mockModules: ModuleHealth[] = [
     canReconnect: false,
     canStart: true,
   },
+  {
+    id: 'mod-notion',
+    name: 'Notion API',
+    status: ModuleHealthStatus.PERMISSION_REQUIRED,
+    statusText: '需要授权',
+    lastHeartbeat: '2026-09-03T09:00:00Z',
+    canReconnect: false,
+    canStart: false,
+    errorMessage: '缺少 Notion 工作区访问权限',
+    metadata: {
+      authRequired: {
+        provider: 'notion',
+        requiredScopes: ['read_content', 'write_content'],
+        description: '需要访问你的 Notion 工作区以同步笔记',
+      },
+    },
+  },
 ]
