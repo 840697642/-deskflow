@@ -1,4 +1,9 @@
-# deskflow
+# tri-mode
+
+NO.1 3mode 的前端工作台仓库。本地工作目录仍使用 `deskflow` 作为目录名。
+
+- 远程仓库：<https://github.com/840697642/tri-mode>
+- 本地目录：`F:\NO.1 3mode\deskflow`
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
 

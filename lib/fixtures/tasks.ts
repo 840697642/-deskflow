@@ -1,0 +1,48 @@
+import { TaskPriority, TaskStatus, type Task } from '@/lib/types/task'
+
+export const mockTasks: Task[] = [
+  {
+    id: 'task-1',
+    title: '审定 AI 视频脚本',
+    status: TaskStatus.TODO,
+    priority: TaskPriority.HIGH,
+    module: 'AI Video',
+    estimatedTime: '30 分钟',
+    projectId: 'project-tri-mode',
+    createdAt: '2026-09-02T09:00:00Z',
+    updatedAt: '2026-09-02T09:00:00Z',
+  },
+  {
+    id: 'task-2',
+    title: '生成角色模型与表情库',
+    status: TaskStatus.TODO,
+    priority: TaskPriority.MEDIUM,
+    module: '创作',
+    estimatedTime: '1 小时',
+    projectId: 'project-tri-mode',
+    createdAt: '2026-09-02T08:30:00Z',
+    updatedAt: '2026-09-02T08:30:00Z',
+  },
+  {
+    id: 'task-3',
+    title: '整理本周研究笔记',
+    status: TaskStatus.TODO,
+    priority: TaskPriority.LOW,
+    module: '知识库',
+    estimatedTime: '45 分钟',
+    projectId: 'project-tri-mode',
+    createdAt: '2026-09-02T08:00:00Z',
+    updatedAt: '2026-09-02T08:00:00Z',
+  },
+  {
+    id: 'task-4',
+    title: '发布 Harmony Game 原型',
+    status: TaskStatus.DONE,
+    priority: TaskPriority.MEDIUM,
+    module: '项目',
+    estimatedTime: '20 分钟',
+    projectId: 'project-tri-mode',
+    createdAt: '2026-09-01T10:00:00Z',
+    updatedAt: '2026-09-02T10:30:00Z',
+  },
+]
