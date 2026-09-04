@@ -2141,7 +2141,11 @@ export default function Workbench({ onDataLoaded }: WorkbenchProps = {}) {
 
   useEffect(() => {
     void Promise.all([fetchToolConnection('video'), fetchToolConnection('game'), fetchToolConnection('app')]).then((connections) => {
-      setCreationConnections(Object.fromEntries(connections.map((connection) => [connection.toolId, connection])) as Record<ToolId, ToolConn>)
+      const mapped = connections.map((connection: ToolConnection) => [connection.toolId, {
+        ...connection,
+        status: connection.status === 'connecting' ? 'starting' : connection.status,
+      } satisfies ToolConn] as const)
+      setCreationConnections(Object.fromEntries(mapped) as Record<ToolId, ToolConn>)
     }).catch(() => undefined)
     void fetchInboxItems({ status: 'pending' }).then((items) => setInbox(items as CreationInboxItem[])).catch(() => undefined)
     void fetchUsageRecords().then((items) => setUsage(items as Usage[])).catch(() => undefined)
