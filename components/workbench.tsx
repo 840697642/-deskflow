@@ -45,6 +45,7 @@ import {
   type LucideProps,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import KnowledgeBase from '@/components/knowledge-base'
 import {
   ApiError,
   cancelJob as cancelJobApi,
@@ -71,7 +72,7 @@ import { TaskStatus as BackendTaskStatus } from '@/lib/types/task'
 // 类型定义（占位类型，后续可直接替换为真实 API 响应类型）
 // =============================================================================
 
-type IconType = ComponentType<LucideProps>
+export type IconType = ComponentType<LucideProps>
 
 export type JobStatus =
   | 'running'
@@ -395,10 +396,10 @@ const DOC_KIND_ICON: Record<KnowledgeDoc['kind'], IconType> = {
 // 状态元数据：颜色 + 文本 + 图标 三者组合，绝不只依赖颜色
 // =============================================================================
 
-type Tone = 'primary' | 'info' | 'warning' | 'success' | 'danger' | 'muted'
+export type Tone = 'primary' | 'info' | 'warning' | 'success' | 'danger' | 'muted'
 
 /** 柔和的着色背景：用于提示条，不带边框 */
-const TONE_BADGE: Record<Tone, string> = {
+export const TONE_BADGE: Record<Tone, string> = {
   primary: 'bg-primary/8 text-primary',
   info: 'bg-info/8 text-info',
   warning: 'bg-warning/10 text-warning',
@@ -407,7 +408,7 @@ const TONE_BADGE: Record<Tone, string> = {
   muted: 'bg-muted text-muted-foreground',
 }
 
-const TONE_TEXT: Record<Tone, string> = {
+export const TONE_TEXT: Record<Tone, string> = {
   primary: 'text-primary',
   info: 'text-info',
   warning: 'text-warning',
@@ -416,7 +417,7 @@ const TONE_TEXT: Record<Tone, string> = {
   muted: 'text-muted-foreground',
 }
 
-const TONE_BAR: Record<Tone, string> = {
+export const TONE_BAR: Record<Tone, string> = {
   primary: 'bg-primary',
   info: 'bg-info',
   warning: 'bg-warning',
@@ -469,12 +470,12 @@ const FILTERS: { id: Filter; label: string; match: (s: JobStatus) => boolean }[]
 // 基础控件：统一的默认 / 悬停 / 键盘焦点 / 禁用 状态
 // =============================================================================
 
-const FOCUS_RING =
+export const FOCUS_RING =
   'outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
 
 type ButtonVariant = 'primary' | 'outline' | 'ghost' | 'danger'
 
-function Button({
+export function Button({
   variant = 'outline',
   size = 'sm',
   className,
@@ -506,7 +507,7 @@ function Button({
 }
 
 /** 图标按钮：必须带 tooltip 与 aria-label */
-function IconButton({
+export function IconButton({
   label,
   icon: Icon,
   className,
@@ -591,7 +592,7 @@ function Skeleton({ className }: { className?: string }) {
   return <div aria-hidden="true" className={cn('animate-pulse rounded-md bg-muted', className)} />
 }
 
-function EmptyState({ icon: Icon, title, description, action }: { icon: IconType; title: string; description: string; action?: ReactNode }) {
+export function EmptyState({ icon: Icon, title, description, action }: { icon: IconType; title: string; description: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
       <div className="mb-2 flex size-12 items-center justify-center rounded-[10px] bg-muted text-muted-foreground">
@@ -621,7 +622,7 @@ function SectionHeader({ title, count, children }: { title: string; count?: numb
 // =============================================================================
 
 /** 通用模态容器：Esc 关闭、点击遮罩关闭、打开时聚焦 */
-function Dialog({
+export function Dialog({
   open,
   onClose,
   title,
@@ -2085,7 +2086,7 @@ export default function Workbench({ onDataLoaded }: WorkbenchProps = {}) {
 
               {view === 'plan' && <PlanBoard cards={plan} onMove={movePlan} />}
 
-              {view === 'knowledge' && <KnowledgePanel docs={docs} onTogglePin={togglePinDoc} />}
+              {view === 'knowledge' && <KnowledgeBase onToast={pushToast} />}
 
               {view === 'services' && (
                 <section aria-label="服务状态" className="overflow-hidden rounded-lg bg-card shadow-sm">
