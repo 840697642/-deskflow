@@ -77,7 +77,8 @@ const INITIAL: Values = {
   'models.ollama.endpoint': { global: 'http://127.0.0.1:11434', overrides: {} },
   'models.default': { global: 'anthropic/claude-sonnet-4.5', overrides: { game: 'ollama/qwen2.5-coder:14b' } },
   'models.budget.daily': { global: 30, overrides: { video: 80 } },
-  'models.budget.monthly': { global: 600, overrides: {} },
+  'models.budget.monthly': { global: 600, overrides: { video: 1200, game: 300, app: 400 } },
+  'models.budget.warnAt': { global: 80, overrides: {} },
   'models.budget.onExceed': { global: 'fallback', overrides: {} },
   'models.routing': {
     global: [
@@ -474,10 +475,35 @@ export default function SettingsView({ onToast }: { onToast: (t: Omit<Toast, 'id
                 <Row title="每月上限（¥）" {...rowProps('models.budget.monthly')}>
                   <input type="number" aria-label="每月上限" value={get<number>('models.budget.monthly')} onChange={(e) => set('models.budget.monthly', Number(e.target.value))} className={cn(inputCls, 'w-28 tabular-nums')} />
                 </Row>
+                <Row title="接近预算提醒（%）" description="月度花费达到该比例时在今日焦点与工作室页高亮提醒。" {...rowProps('models.budget.warnAt')}>
+                  <input type="number" min={50} max={100} aria-label="接近预算提醒百分比" value={get<number>('models.budget.warnAt')} onChange={(e) => set('models.budget.warnAt', Number(e.target.value))} className={cn(inputCls, 'w-28 tabular-nums')} />
+                </Row>
                 <Row title="超限行为" {...rowProps('models.budget.onExceed')}>
                   <Segmented label="超限行为" value={get<string>('models.budget.onExceed')} onChange={(v) => set('models.budget.onExceed', v)} options={[{ id: 'fallback', label: '降级到本地' }, { id: 'pause', label: '暂停任务' }, { id: 'notify', label: '仅提醒' }]} />
                 </Row>
               </Card>
+
+              {scope === 'global' && (
+                <Card title="各工具月度预算一览" description="每个创作工具的月度上限；切换到对应项目作用域可单独修改，未覆盖的沿用全局值。">
+                  <ul className="grid gap-3 py-2 md:grid-cols-3">
+                    {(['video', 'game', 'app'] as const).map((id) => {
+                      const budget = values['models.budget.monthly']
+                      const amount = (budget.overrides[id] ?? budget.global) as number
+                      const overridden = budget.overrides[id] !== undefined
+                      const meta = SCOPES.find((entry) => entry.id === id)!
+                      const Icon = meta.icon
+                      return (
+                        <li key={id} className="flex items-center gap-3 rounded-lg bg-muted/60 px-3 py-2.5">
+                          <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                          <span className="flex-1 text-[13px] text-foreground">{meta.label}</span>
+                          <span className="text-[13px] tabular-nums text-foreground">¥{amount}</span>
+                          <span className={cn('rounded px-1.5 py-0.5 text-[11px] font-medium', overridden ? 'bg-primary/8 text-primary' : 'bg-muted text-muted-foreground')}>{overridden ? '已覆盖' : '继承'}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </Card>
+              )}
 
               <Card title="任务路由表" description="任务类型 → 首选模型 → 降级链；拖动手柄可调整优先级（接入后端后生效）。" action={isProject && <span className={cn('rounded px-1.5 py-0.5 text-[11px] font-medium', isOverridden('models.routing') ? 'bg-primary/8 text-primary' : 'bg-muted text-muted-foreground')}>{isOverridden('models.routing') ? '已覆盖' : '继承全局'}</span>}>
                 <div className="py-2">
