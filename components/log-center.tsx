@@ -245,12 +245,19 @@ function TreeRow({ node, depth, selectedId, onSelect, expanded, toggle, errorOnl
 // 时间刷：迷你直方图（每 10 分钟一桶）
 // =============================================================================
 
+function parseLogTime(ts: string): [number, number] {
+  const date = new Date(ts)
+  if (!Number.isNaN(date.getTime())) return [date.getHours(), date.getMinutes()]
+  const [hour, minute] = ts.split(':').map(Number)
+  return [Number.isFinite(hour) ? hour : 0, Number.isFinite(minute) ? minute : 0]
+}
+
 function TimeBrush({ entries, range, onChange }: { entries: LogEntry[]; range: [number, number] | null; onChange: (r: [number, number] | null) => void }) {
   const buckets = useMemo(() => {
     const b: Record<number, Record<LogLevel, number>> = {}
     for (let i = 0; i < 12; i++) b[i] = { bug: 0, warn: 0, notice: 0, info: 0, debug: 0 }
     for (const e of entries) {
-      const [h, m] = e.ts.split(':').map(Number)
+      const [h, m] = parseLogTime(e.ts)
       const idx = Math.min(11, Math.max(0, Math.floor(((h - 9) * 60 + m) / 10))) // 09:00–11:00
       b[idx][e.level] += e.repeat ?? 1
     }
@@ -341,7 +348,7 @@ export default function LogCenter({ onToast, onExplainWithAi, onOpenJob }: LogCe
       if (!categories.has(l.category)) return false
       if (unreadOnly && l.read) return false
       if (range) {
-        const [h, m] = l.ts.split(':').map(Number)
+        const [h, m] = parseLogTime(l.ts)
         const idx = Math.floor(((h - 9) * 60 + m) / 10)
         if (idx < range[0] || idx > range[1]) return false
       }
