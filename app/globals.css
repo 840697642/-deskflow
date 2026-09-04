@@ -161,3 +161,32 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* 跑马灯：无缝循环，悬停暂停，减少动态偏好时静止 */
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ticker-track {
+  animation: ticker-scroll 40s linear infinite;
+}
+
+.ticker-mask:hover .ticker-track,
+.ticker-mask:focus-within .ticker-track {
+  animation-play-state: paused;
+}
+
+.ticker-mask {
+  mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none;
+  }
+}
