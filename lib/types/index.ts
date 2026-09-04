@@ -4,6 +4,7 @@ export * from './module'
 export * from './task'
 export * from './auth'
 export * from './knowledge-doc'
+export * from './creation-tools'
 export {
   AISummaryStatus, ConversationTool, ErrorSeverity, ErrorStatus, FilePriority, FileSource, SpaceType,
 } from './knowledge'

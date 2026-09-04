@@ -52,6 +52,12 @@ import AiChatPanel, { type ChatContext } from '@/components/ai-chat-panel'
 import SettingsView from '@/components/settings-view'
 import LogCenter from '@/components/log-center'
 import SkillLibrary from '@/components/skill-library'
+import VideoStudio from '@/components/video-studio'
+import GameStudio from '@/components/game-studio'
+import AppStudio from '@/components/app-studio'
+import PlanInbox, { type AcceptPayload } from '@/components/plan-inbox'
+import { ToolTimeShare, UsageBreakdown, UsageSummary, totalFor } from '@/components/usage-overview'
+import type { InboxItem as CreationInboxItem, StudioCardModel, ToolConn, ToolId, ToolTimeDay, Usage } from '@/components/creation-shared'
 import {
   ApiError,
   cancelJob as cancelJobApi,
@@ -63,6 +69,15 @@ import {
   reconnectModule as reconnectModuleApi,
   resumeJob as resumeJobApi,
   retryJob as retryJobApi,
+  acceptInboxItem,
+  createInboxItem,
+  dismissInboxItem,
+  fetchInboxItems,
+  fetchStudioCards,
+  fetchToolConnection,
+  fetchToolTimeStats,
+  fetchUsageRecords,
+  saveCardAsError,
   updateTask as updateTaskApi,
 } from '@/lib/api-client'
 import {
@@ -73,6 +88,7 @@ import {
   aggregateProjects,
 } from '@/lib/adapters/workbench-adapter'
 import { TaskStatus as BackendTaskStatus } from '@/lib/types/task'
+import type { ToolConnection } from '@/lib/types/creation-tools'
 
 // =============================================================================
 // 类型定义（占位类型，后续可直接替换为真实 API 响应类型）
@@ -1426,7 +1442,7 @@ function KnowledgePanel({ docs, onTogglePin }: { docs: KnowledgeDoc[]; onToggleP
 // 视图切换：左侧导航驱动，每个视图一屏完成，避免纵向堆叠
 // =============================================================================
 
-type View = 'focus' | 'queue' | 'plan' | 'knowledge' | 'services' | 'projects' | 'changelog' | 'skills' | 'logs' | 'settings'
+type View = 'focus' | 'queue' | 'plan' | 'knowledge' | 'services' | 'projects' | 'changelog' | 'skills' | 'logs' | 'settings' | 'video' | 'game' | 'app'
 
 const NAV_VIEW: Record<string, View> = {
   workbench: 'focus',
@@ -1439,6 +1455,9 @@ const NAV_VIEW: Record<string, View> = {
   skills: 'skills',
   logs: 'logs',
   settings: 'settings',
+  video: 'video',
+  game: 'game',
+  app: 'app',
 }
 
 const VIEW_META: Record<View, { title: string; description: string }> = {
@@ -1452,6 +1471,9 @@ const VIEW_META: Record<View, { title: string; description: string }> = {
   skills: { title: 'Skill 库', description: '管理可复用技能、效果展示与进化谱系。' },
   logs: { title: '日志中心', description: '按来源、级别和链路查看运行日志。' },
   settings: { title: '设置', description: '管理全局与项目作用域的模型、规则和通知。' },
+  video: { title: 'AI 视频工作室', description: '脚本、分镜与导演台的状态摘要。' },
+  game: { title: '鸿蒙游戏工作室', description: '引擎、问题阻塞与里程碑状态。' },
+  app: { title: '应用开发工作室', description: 'Bug、构建部署与依赖告警。' },
 }
 
 // =============================================================================
@@ -2067,6 +2089,13 @@ export default function Workbench({ onDataLoaded }: WorkbenchProps = {}) {
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
   const [announceOpen, setAnnounceOpen] = useState(false)
   const [noticeOpen, setNoticeOpen] = useState(true)
+  const [creationConnections, setCreationConnections] = useState<Record<ToolId, ToolConn>>({
+    video: { toolId: 'video', status: 'starting' }, game: { toolId: 'game', status: 'starting' }, app: { toolId: 'app', status: 'starting' },
+  })
+  const [studioCards, setStudioCards] = useState<StudioCardModel[]>([])
+  const [inbox, setInbox] = useState<CreationInboxItem[]>([])
+  const [usage, setUsage] = useState<Usage[]>([])
+  const [toolTime, setToolTime] = useState<ToolTimeDay[]>([])
   const toastSeq = useRef(0)
 
   const pushToast = useCallback((t: Omit<Toast, 'id'>) => {
@@ -2110,6 +2139,20 @@ export default function Workbench({ onDataLoaded }: WorkbenchProps = {}) {
     void loadData()
   }, [loadData])
 
+  useEffect(() => {
+    void Promise.all([fetchToolConnection('video'), fetchToolConnection('game'), fetchToolConnection('app')]).then((connections) => {
+      setCreationConnections(Object.fromEntries(connections.map((connection) => [connection.toolId, connection])) as Record<ToolId, ToolConn>)
+    }).catch(() => undefined)
+    void fetchInboxItems({ status: 'pending' }).then((items) => setInbox(items as CreationInboxItem[])).catch(() => undefined)
+    void fetchUsageRecords().then((items) => setUsage(items as Usage[])).catch(() => undefined)
+    void fetchToolTimeStats({ days: 7 }).then((items) => setToolTime(items as ToolTimeDay[])).catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    if (view !== 'video' && view !== 'game' && view !== 'app') return
+    void fetchStudioCards(view).then((cards) => setStudioCards(cards as StudioCardModel[])).catch(() => setStudioCards([]))
+  }, [view])
+
   const togglePinAnnouncement = (id: string) => {
     const target = announcements.find((a) => a.id === id)
     setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, pinned: !a.pinned } : a)))
@@ -2139,6 +2182,33 @@ export default function Workbench({ onDataLoaded }: WorkbenchProps = {}) {
       setError(message)
       pushToast({ tone: 'danger', title: '更新计划失败', description: message })
     }
+  }
+
+  const pendingInbox = inbox.filter((item) => item.status === 'pending')
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const creationDomain = (tool: ToolId): Domain => tool === 'video' ? 'video' : tool === 'game' ? 'game' : 'app'
+  const acceptInbox = async (id: string, payload: AcceptPayload) => {
+    try {
+      const card = await acceptInboxItem(id, payload)
+      const source = inbox.find((item) => item.id === id)
+      if (source) {
+        setInbox((items) => items.map((item) => item.id === id ? { ...item, status: 'accepted' } : item))
+        setPlan((cards) => [...cards, { id: card.id, title: card.title, project: card.project, domain: creationDomain(source.toolId), due: payload.due ?? '待定', priority: payload.priority, column: payload.column }])
+      }
+      pushToast({ tone: 'success', title: '已采纳到计划看板', description: source?.title })
+    } catch (err) { pushToast({ tone: 'danger', title: '采纳失败', description: err instanceof ApiError ? err.message : '请稍后重试' }) }
+  }
+  const dismissInbox = async (id: string) => {
+    try { await dismissInboxItem(id); setInbox((items) => items.map((item) => item.id === id ? { ...item, status: 'dismissed' } : item)); pushToast({ tone: 'info', title: '已忽略收件箱条目' }) }
+    catch (err) { pushToast({ tone: 'danger', title: '忽略失败', description: err instanceof ApiError ? err.message : '请稍后重试' }) }
+  }
+  const addCreationCardToPlan = async (card: StudioCardModel) => {
+    try { const item = await createInboxItem({ toolId: card.toolId, type: card.errorable ? 'issue' : 'task', title: card.title, note: card.subtitle, refUrl: card.deepLink }); setInbox((items) => [item as CreationInboxItem, ...items]); pushToast({ tone: 'success', title: '已加入计划收件箱', description: card.title }) }
+    catch (err) { pushToast({ tone: 'danger', title: '加入计划失败', description: err instanceof ApiError ? err.message : '请稍后重试' }) }
+  }
+  const saveCreationCardAsError = async (card: StudioCardModel) => {
+    try { await saveCardAsError({ toolId: card.toolId, title: card.title, refUrl: card.deepLink, cardId: card.id }); pushToast({ tone: 'success', title: '已保存为错题', description: card.title }) }
+    catch (err) { pushToast({ tone: 'danger', title: '保存错题失败', description: err instanceof ApiError ? err.message : '请稍后重试' }) }
   }
 
   const realJobs = useMemo(() => jobs.filter((j) => j.status !== 'loading'), [jobs])
@@ -2339,24 +2409,34 @@ export default function Workbench({ onDataLoaded }: WorkbenchProps = {}) {
               </div>
 
               {view === 'focus' && (
-                <FocusView
-                  jobs={jobs}
-                  plan={plan}
-                  docs={docs}
-                  announcements={announcements}
-                  services={services}
-                  onJobAction={handleAction}
-                  onServiceAction={(id) => void handleServiceAction(id)}
-                  onSelectJob={(id) => {
-                    setSelectedId(id)
-                    setInspectorOpen(true)
-                  }}
-                  onNavigate={navigate}
-                  onTogglePinDoc={togglePinDoc}
-                />
+                <>
+                  <FocusView
+                    jobs={jobs}
+                    plan={plan}
+                    docs={docs}
+                    announcements={announcements}
+                    services={services}
+                    onJobAction={handleAction}
+                    onServiceAction={(id) => void handleServiceAction(id)}
+                    onSelectJob={(id) => {
+                      setSelectedId(id)
+                      setInspectorOpen(true)
+                    }}
+                    onNavigate={navigate}
+                    onTogglePinDoc={togglePinDoc}
+                  />
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <UsageSummary usage={usage} today={todayIso} budgets={{ video: 1200, game: 300, app: 400 }} onNavigate={(tool) => navigate(tool)} />
+                    <ToolTimeShare days={toolTime} />
+                  </div>
+                </>
               )}
 
-              {view === 'plan' && <PlanBoard cards={plan} onMove={movePlan} />}
+              {view === 'plan' && <><PlanInbox items={inbox} onAccept={acceptInbox} onDismiss={(id) => void dismissInbox(id)} /><PlanBoard cards={plan} onMove={movePlan} /></>}
+
+              {view === 'video' && <><VideoStudio cards={studioCards.filter((card) => card.toolId === 'video')} conn={creationConnections.video} todayCost={totalFor(usage, todayIso, 'today', 'video').cost} todayTokens={totalFor(usage, todayIso, 'today', 'video').tokens} onToast={pushToast} onAddToPlan={(card) => void addCreationCardToPlan(card)} onSaveError={(card) => void saveCreationCardAsError(card)} /><UsageBreakdown usage={usage} today={todayIso} toolId="video" budget={1200} /></>}
+              {view === 'game' && <><GameStudio cards={studioCards.filter((card) => card.toolId === 'game')} conn={creationConnections.game} todayCost={totalFor(usage, todayIso, 'today', 'game').cost} todayTokens={totalFor(usage, todayIso, 'today', 'game').tokens} onToast={pushToast} onAddToPlan={(card) => void addCreationCardToPlan(card)} onSaveError={(card) => void saveCreationCardAsError(card)} /><UsageBreakdown usage={usage} today={todayIso} toolId="game" budget={300} /></>}
+              {view === 'app' && <><AppStudio cards={studioCards.filter((card) => card.toolId === 'app')} conn={creationConnections.app} todayCost={totalFor(usage, todayIso, 'today', 'app').cost} todayTokens={totalFor(usage, todayIso, 'today', 'app').tokens} onToast={pushToast} onAddToPlan={(card) => void addCreationCardToPlan(card)} onSaveError={(card) => void saveCreationCardAsError(card)} /><UsageBreakdown usage={usage} today={todayIso} toolId="app" budget={400} /></>}
 
               {view === 'changelog' && <ChangelogView onToast={pushToast} />}
 

@@ -22,6 +22,7 @@ import type { ChatModel, ChatSession } from './types/chat'
 import type { LogEntry } from './types/logs'
 import type { Skill } from './types/skills'
 import type { SettingsResponse } from './types/settings'
+import type { AcceptInboxPayload, CreateInboxItemPayload, InboxItem, SaveAsErrorPayload, StudioCardModel, ToolConnection, ToolId, ToolTimeDay, UsageRecord } from './types/creation-tools'
 
 const API_SCHEMA_VERSION = '1.0'
 const DEFAULT_ACTOR = 'claude-code'
@@ -387,6 +388,15 @@ export async function createChatSession(input: Pick<ChatSession, 'spaceId' | 'mo
 export async function fetchSkills(options?: ApiClientOptions): Promise<Skill[]> { return requestJson<Skill[]>('/api/skills', {}, options) }
 export async function fetchLogs(options?: ApiClientOptions): Promise<LogEntry[]> { return requestJson<LogEntry[]>('/api/logs', {}, options) }
 export async function fetchSettings(scope?: string, options?: ApiClientOptions): Promise<SettingsResponse> { return requestJson<SettingsResponse>(`/api/settings${queryString({ scope })}`, {}, options) }
+export async function fetchToolConnection(tool: ToolId, options?: ApiClientOptions): Promise<ToolConnection> { return requestJson<ToolConnection>(`/api/tools/${encodePathSegment(tool)}/connection`, {}, options) }
+export async function fetchStudioCards(tool: ToolId, options?: ApiClientOptions): Promise<StudioCardModel[]> { return requestJson<StudioCardModel[]>(`/api/studios/${encodePathSegment(tool)}/cards`, {}, options) }
+export async function fetchInboxItems(params?: { status?: string }, options?: ApiClientOptions): Promise<InboxItem[]> { return requestJson<InboxItem[]>(`/api/inbox${queryString({ status: params?.status })}`, {}, options) }
+export async function createInboxItem(input: CreateInboxItemPayload, meta?: MutationInput, options?: ApiClientOptions): Promise<InboxItem> { return requestJson<InboxItem>('/api/inbox', { method: 'POST', body: jsonBody(mutationBody(input, meta)) }, options) }
+export async function acceptInboxItem(id: string, input: AcceptInboxPayload, meta?: MutationInput, options?: ApiClientOptions): Promise<{ id: string; column: string; priority: string; project: string; title: string }> { return requestJson(`/api/inbox/${encodePathSegment(id)}/accept`, { method: 'POST', body: jsonBody(mutationBody(input, meta)) }, options) }
+export async function dismissInboxItem(id: string, meta?: MutationInput, options?: ApiClientOptions): Promise<InboxItem> { return requestJson<InboxItem>(`/api/inbox/${encodePathSegment(id)}/dismiss`, { method: 'POST', body: jsonBody(mutationBody({}, meta)) }, options) }
+export async function fetchUsageRecords(params?: { from?: string; to?: string; tool?: ToolId }, options?: ApiClientOptions): Promise<UsageRecord[]> { return requestJson<UsageRecord[]>(`/api/usage${queryString({ from: params?.from, to: params?.to, tool: params?.tool })}`, {}, options) }
+export async function fetchToolTimeStats(params?: { days?: number }, options?: ApiClientOptions): Promise<ToolTimeDay[]> { return requestJson<ToolTimeDay[]>(`/api/usage/time${queryString({ days: params?.days?.toString() })}`, {}, options) }
+export async function saveCardAsError(input: SaveAsErrorPayload, meta?: MutationInput, options?: ApiClientOptions): Promise<ErrorEntry> { return requestJson<ErrorEntry>('/api/errors', { method: 'POST', body: jsonBody(mutationBody(input, meta)) }, options) }
 
 export async function summarizeKnowledgeConversation(id: string, meta?: MutationInput, options?: ApiClientOptions): Promise<KnowledgeConversation> {
   return requestJson<KnowledgeConversation>(`/api/knowledge/conversations/${encodePathSegment(id)}/summarize`, { method: 'POST', body: jsonBody(mutationBody({}, meta)) }, options)

@@ -14,6 +14,7 @@ import { mockSkills } from '@/lib/fixtures/skills'
 import { mockLogs } from '@/lib/fixtures/logs'
 import { defaultSettings, projectOverrides } from '@/lib/fixtures/settings'
 import { mockChatModels, mockChatSessions } from '@/lib/fixtures/chat-sessions'
+import { mockToolConnections, mockStudioCards, mockInboxItems, mockUsageRecords, mockToolTimeDays, mockPlanCards } from '@/lib/fixtures/creation-tools'
 import type { ApiSuccess, Artifact, Conversation } from '@/lib/types/common'
 import type { Job } from '@/lib/types/job'
 import type { ModuleHealth } from '@/lib/types/module'
@@ -23,6 +24,7 @@ import type { ApiKeyRecord, Conversation as KnowledgeConversation, ErrorEntry, F
 import type { Skill } from '@/lib/types/skills'
 import type { LogEntry } from '@/lib/types/logs'
 import type { ChatModel, ChatSession } from '@/lib/types/chat'
+import type { InboxItem, StudioCardModel, ToolConnection, ToolTimeDay, UsageRecord } from '@/lib/types/creation-tools'
 
 export interface MutationRecord {
   status: number
@@ -48,6 +50,12 @@ export interface MockStore {
   projectSettings: Record<string, Record<string, unknown>>
   chatModels: ChatModel[]
   chatSessions: ChatSession[]
+  toolConnections: ToolConnection[]
+  studioCards: StudioCardModel[]
+  inboxItems: InboxItem[]
+  usageRecords: UsageRecord[]
+  toolTimeDays: ToolTimeDay[]
+  planCards: typeof mockPlanCards
   mutations: Map<string, MutationRecord>
 }
 
@@ -70,13 +78,14 @@ function createStore(): MockStore {
     skills: mockSkills.map((skill) => ({ ...skill, tags: [...skill.tags], domains: [...skill.domains], structure: [...skill.structure], useCases: [...skill.useCases], showcase: [...skill.showcase] })),
     logs: mockLogs.map((log) => ({ ...log, data: log.data ? { ...log.data } : undefined })),
     settings: { ...defaultSettings }, projectSettings: { ...projectOverrides }, chatModels: mockChatModels.map((model) => ({ ...model })), chatSessions: mockChatSessions.map((session) => ({ ...session, contexts: [...session.contexts], messages: session.messages.map((message) => ({ ...message })) })),
+    toolConnections: mockToolConnections.map((item) => ({ ...item })), studioCards: mockStudioCards.map((item) => ({ ...item, meta: item.meta.map((meta) => ({ ...meta })) })), inboxItems: mockInboxItems.map((item) => ({ ...item })), usageRecords: mockUsageRecords.map((item) => ({ ...item })), toolTimeDays: mockToolTimeDays.map((item) => ({ ...item, minutes: { ...item.minutes } })), planCards: mockPlanCards.map((item) => ({ ...item })),
     mutations: new Map(),
   }
 }
 
 export function getMockStore(): MockStore {
   const current = globalState.__triModeMockStore
-  if (!current || !Array.isArray(current.skills) || !Array.isArray(current.logs) || !current.settings || !Array.isArray(current.chatSessions)) globalState.__triModeMockStore = createStore()
+  if (!current || !Array.isArray(current.skills) || !Array.isArray(current.logs) || !current.settings || !Array.isArray(current.chatSessions) || !Array.isArray(current.inboxItems) || !Array.isArray(current.studioCards)) globalState.__triModeMockStore = createStore()
   return globalState.__triModeMockStore!
 }
 
