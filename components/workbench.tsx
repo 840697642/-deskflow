@@ -383,7 +383,7 @@ const MOCK_DOCS: KnowledgeDoc[] = [
   { id: 'd-3', title: 'HAP 签名与发布流程', kind: 'doc', project: '星尘塔防', updatedAt: '3 天前', size: '22 KB', pinned: true },
   { id: 'd-4', title: 'LedgerService 测试用例矩阵', kind: 'sheet', project: '轻记账', updatedAt: '26 分钟前', size: '96 KB', pinned: false },
   { id: 'd-5', title: '分镜提示词模板库', kind: 'code', project: '技能库', updatedAt: '5 小时前', size: '14 KB', pinned: false },
-  { id: 'd-6', title: '云 TTS 音色对���表', kind: 'sheet', project: '山海拾遗', updatedAt: '1 周前', size: '31 KB', pinned: false },
+  { id: 'd-6', title: '云 TTS 音色对照表', kind: 'sheet', project: '山海拾遗', updatedAt: '1 周前', size: '31 KB', pinned: false },
 ]
 
 const MOCK_PLAN: PlanCard[] = [
@@ -2521,7 +2521,7 @@ export default function Workbench({ onDataLoaded }: WorkbenchProps = {}) {
                     任务队列
                   </span>
 
-                  {/* 状态���选：可点击，承担实际筛选功能 */}
+                  {/* 状态筛选：可点击，承担实际筛选功能 */}
                   <div role="tablist" aria-label="按状态筛选" className="flex gap-1 px-4 pb-4">
                     {FILTERS.map((f) => {
                       const isActive = f.id === filter
@@ -2644,7 +2644,7 @@ export default function Workbench({ onDataLoaded }: WorkbenchProps = {}) {
       </Dialog>
 
       {/* 公告管理：置顶 / 取消置顶 */}
-      <Dialog open={announceOpen} onClose={closeAnnounce} icon={Megaphone} title="公告管理" description="置顶的公告会优先出现在跑马灯中，并在进入工作台时弹出��醒。" width="lg" footer={<Button variant="primary" size="md" onClick={closeAnnounce}>完成</Button>}>
+      <Dialog open={announceOpen} onClose={closeAnnounce} icon={Megaphone} title="公告管理" description="置顶的公告会优先出现在跑马灯中，并在进入工作台时弹出提醒。" width="lg" footer={<Button variant="primary" size="md" onClick={closeAnnounce}>完成</Button>}>
         <ul className="divide-y divide-border/60 rounded-lg bg-muted/60">
           {announcements.map((a) => (
             <li key={a.id} className="flex items-start gap-3 p-4">

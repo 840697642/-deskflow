@@ -339,7 +339,7 @@ export default function LogCenter({ onToast, onExplainWithAi, onOpenJob }: LogCe
   }, [logs])
   const unreadCount = logs.filter((l) => !l.read).length
 
-  /** 过滤：来源 / 类别 / ��别 / 时间 / 搜索；树模式下只按 trace 过滤，保留链路完整 */
+  /** 过滤：来源 / 类别 / 级别 / 时间 / 搜索；树模式下只按 trace 过滤，保留链路完整 */
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     const matches = (l: LogEntry) => {
