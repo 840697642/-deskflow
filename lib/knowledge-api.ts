@@ -47,6 +47,24 @@ export function requestedSpaceMismatch(request: NextRequest, actualSpaceId: stri
 export function parseBoolean(value: unknown): boolean | undefined { return value === undefined ? undefined : typeof value === 'boolean' ? value : undefined }
 export function parseArray<T>(value: unknown): T[] | undefined { return Array.isArray(value) ? value as T[] : undefined }
 
+export function paginationParams(request: Request, maxLimit = 100): { page: number; limit: number } | { error: NextResponse } {
+  const params = new URL(request.url).searchParams
+  const rawPage = Number(params.get('page') ?? '1')
+  const rawLimit = Number(params.get('limit') ?? '20')
+  if (!Number.isInteger(rawPage) || rawPage < 1 || !Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > maxLimit) {
+    return { error: jsonError(request, 400, 'INVALID_QUERY', `page 必须为正整数，limit 必须为 1-${maxLimit}`, false) }
+  }
+  return { page: rawPage, limit: rawLimit }
+}
+
+export function paginated<T>(items: T[], page: number, limit: number) {
+  return { data: items.slice((page - 1) * limit, page * limit), pagination: { page, limit, total: items.length, totalPages: Math.ceil(items.length / limit) } }
+}
+
+export function errorSignature(message: string): string {
+  return message.replace(/at\s+.+?:\d+:\d+/gi, '').replace(/`[^`]*`|'[^']*'|"[^"]*"/g, 'X').replace(/\d+/g, 'N').replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
 export function authorizeCollector(request: NextRequest, scope: ApiKeyScope, requestedSpaceId?: string): { record?: ApiKeyRecord; spaceId: string; error?: NextResponse } {
   const auth = request.headers.get('authorization')
   if (!auth?.startsWith('Bearer ')) return { spaceId: requestedSpaceId ?? 'space-inbox', error: jsonError(request, 401, 'UNAUTHORIZED', '缺少 Authorization 头', false) }
@@ -73,9 +91,10 @@ export function extractErrors(messages: ConversationMessage[]): string[] { retur
 
 export function upsertError(spaceId: string, errorMessage: string, relatedConversationId?: string): ErrorEntry {
   const store = getMockStore(); const now = new Date().toISOString()
-  const existing = store.knowledgeErrors.find((entry) => entry.spaceId === spaceId && entry.errorMessage === errorMessage)
-  if (existing) { existing.occurrenceCount += 1; existing.lastOccurredAt = now; if (relatedConversationId) existing.relatedConversationId = relatedConversationId; return existing }
-  const created: ErrorEntry = { id: `kerr-${crypto.randomUUID()}`, spaceId, title: errorMessage.slice(0, 80), errorMessage, severity: 'high' as ErrorSeverity, reproductionPath: '自动采集', status: ErrorStatus.UNRESOLVED, occurrenceCount: 1, relatedConversationId, relatedFileIds: [], firstOccurredAt: now, lastOccurredAt: now }
+  const signature = errorSignature(errorMessage)
+  const existing = store.knowledgeErrors.find((entry) => entry.spaceId === spaceId && entry.signature === signature)
+  if (existing) { existing.occurrenceCount += 1; existing.lastOccurredAt = now; existing.contexts.push({ message: errorMessage, reproductionPath: '自动采集', occurredAt: now }); if (relatedConversationId) existing.relatedConversationId = relatedConversationId; return existing }
+  const created: ErrorEntry = { id: `kerr-${crypto.randomUUID()}`, spaceId, title: errorMessage.slice(0, 80), errorMessage, signature, severity: 'high' as ErrorSeverity, reproductionPath: '自动采集', status: ErrorStatus.UNRESOLVED, occurrenceCount: 1, contexts: [{ message: errorMessage, reproductionPath: '自动采集', occurredAt: now }], relatedConversationId, relatedFileIds: [], firstOccurredAt: now, lastOccurredAt: now }
   store.knowledgeErrors.push(created); return created
 }
 

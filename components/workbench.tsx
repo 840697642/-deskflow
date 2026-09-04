@@ -48,6 +48,10 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import KnowledgeBase from '@/components/knowledge-base'
+import AiChatPanel, { type ChatContext } from '@/components/ai-chat-panel'
+import SettingsView from '@/components/settings-view'
+import LogCenter from '@/components/log-center'
+import SkillLibrary from '@/components/skill-library'
 import {
   ApiError,
   cancelJob as cancelJobApi,
@@ -892,7 +896,7 @@ function NavRail({ active, onSelect, services }: { active: string; onSelect: (id
 // 顶部命令栏（64px，磨砂玻璃）
 // =============================================================================
 
-function CommandBar({ current, inspectorOpen, onToggleInspector }: { current: string; inspectorOpen: boolean; onToggleInspector: () => void }) {
+function CommandBar({ current, inspectorOpen, onToggleInspector, chatOpen, onToggleChat }: { current: string; inspectorOpen: boolean; onToggleInspector: () => void; chatOpen: boolean; onToggleChat: () => void }) {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-6 border-b border-foreground/[0.04] bg-card/75 px-6 backdrop-blur-xl">
       <div className="flex min-w-0 items-center gap-4">
@@ -930,6 +934,7 @@ function CommandBar({ current, inspectorOpen, onToggleInspector }: { current: st
         </Button>
         <div className="mx-2 h-5 w-px bg-border" aria-hidden="true" />
         <IconButton label="通知（2 条未读）" icon={Bell} />
+        <IconButton label={chatOpen ? '关闭 AI 对话' : '打开 AI 对话'} icon={MessageSquareMore} active={chatOpen} onClick={onToggleChat} />
         <IconButton label={inspectorOpen ? '关闭检查器' : '打开检查器'} icon={PanelRight} active={inspectorOpen} onClick={onToggleInspector} />
       </div>
     </header>
@@ -1421,7 +1426,7 @@ function KnowledgePanel({ docs, onTogglePin }: { docs: KnowledgeDoc[]; onToggleP
 // 视图切换：左侧导航驱动，每个视图一屏完成，避免纵向堆叠
 // =============================================================================
 
-type View = 'focus' | 'queue' | 'plan' | 'knowledge' | 'services' | 'projects' | 'changelog'
+type View = 'focus' | 'queue' | 'plan' | 'knowledge' | 'services' | 'projects' | 'changelog' | 'skills' | 'logs' | 'settings'
 
 const NAV_VIEW: Record<string, View> = {
   workbench: 'focus',
@@ -1431,6 +1436,9 @@ const NAV_VIEW: Record<string, View> = {
   services: 'services',
   projects: 'projects',
   changelog: 'changelog',
+  skills: 'skills',
+  logs: 'logs',
+  settings: 'settings',
 }
 
 const VIEW_META: Record<View, { title: string; description: string }> = {
@@ -1441,6 +1449,9 @@ const VIEW_META: Record<View, { title: string; description: string }> = {
   services: { title: '本地 / 云服务', description: '服务连接状态与需要处理的授权、重连。' },
   projects: { title: '项目', description: '最近活跃的项目及其运行中的任务。' },
   changelog: { title: '开发日志', description: '前端每次迭代的改动、数据契约与后端对接要点。' },
+  skills: { title: 'Skill 库', description: '管理可复用技能、效果展示与进化谱系。' },
+  logs: { title: '日志中心', description: '按来源、级别和链路查看运行日志。' },
+  settings: { title: '设置', description: '管理全局与项目作用域的模型、规则和通知。' },
 }
 
 // =============================================================================
@@ -2042,6 +2053,7 @@ export default function Workbench({ onDataLoaded }: WorkbenchProps = {}) {
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedId, setSelectedId] = useState<string | undefined>()
   const [inspectorOpen, setInspectorOpen] = useState(true)
+  const [chatOpen, setChatOpen] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
 
@@ -2257,7 +2269,7 @@ export default function Workbench({ onDataLoaded }: WorkbenchProps = {}) {
       <NavRail active={activeNav} onSelect={setActiveNav} services={services} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <CommandBar current={VIEW_META[view].title} inspectorOpen={inspectorOpen} onToggleInspector={() => setInspectorOpen((v) => !v)} />
+        <CommandBar current={VIEW_META[view].title} inspectorOpen={inspectorOpen} onToggleInspector={() => { setInspectorOpen((v) => !v); setChatOpen(false) }} chatOpen={chatOpen} onToggleChat={() => { setChatOpen((v) => !v); setInspectorOpen(false) }} />
         <Ticker items={announcements} onManage={() => setAnnounceOpen(true)} />
 
         <div className="relative flex min-h-0 flex-1">
@@ -2349,6 +2361,10 @@ export default function Workbench({ onDataLoaded }: WorkbenchProps = {}) {
               {view === 'changelog' && <ChangelogView onToast={pushToast} />}
 
               {view === 'knowledge' && <KnowledgeBase onToast={pushToast} />}
+
+              {view === 'skills' && <SkillLibrary onToast={pushToast} />}
+              {view === 'logs' && <LogCenter onToast={pushToast} onExplainWithAi={() => setChatOpen(true)} onOpenJob={(id) => { setSelectedId(id); setInspectorOpen(true); setChatOpen(false) }} />}
+              {view === 'settings' && <SettingsView onToast={pushToast} />}
 
               {view === 'services' && (
                 <section aria-label="服务状态" className="overflow-hidden rounded-lg bg-card shadow-sm">
@@ -2504,6 +2520,7 @@ export default function Workbench({ onDataLoaded }: WorkbenchProps = {}) {
           {inspectorOpen && (
             <Inspector job={selectedJob} onClose={() => setInspectorOpen(false)} onAction={(a) => selectedJob && handleAction(selectedJob.id, a)} />
           )}
+          {chatOpen && <AiChatPanel onClose={() => setChatOpen(false)} onToast={pushToast} viewHint={view} autoContexts={selectedId ? [{ kind: 'job', id: selectedId, label: '当前任务' }] : []} />}
         </div>
       </div>
 

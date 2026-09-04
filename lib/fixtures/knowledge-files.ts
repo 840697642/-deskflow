@@ -1,7 +1,7 @@
 import type { KnowledgeFile } from '@/lib/types/knowledge'
-import { FilePriority, FileSource } from '@/lib/types/knowledge'
+import { AISummaryStatus, FilePriority, FileSource } from '@/lib/types/knowledge'
 const base = '2026-09-04T10:00:00Z'
-export const mockKnowledgeFiles: KnowledgeFile[] = [
+const rawKnowledgeFiles = [
   { id: 'kfile-1', spaceId: 'space-ai-video', title: '视频制作规范', type: 'markdown', source: FileSource.AI_IMPORT, priority: FilePriority.CRITICAL, tags: ['AI', '流程'], content: '# 视频制作规范', metadata: { size: '12 KB', author: 'Claude Code' }, createdAt: base, updatedAt: base },
   { id: 'kfile-2', spaceId: 'space-ai-video', title: '镜头脚本', type: 'note', source: FileSource.MANUAL_UPLOAD, priority: FilePriority.PENDING, tags: ['脚本'], content: 'Scene 01', metadata: { size: '8 KB' }, createdAt: base, updatedAt: base },
   { id: 'kfile-3', spaceId: 'space-ai-video', title: '渲染配置', type: 'code', source: FileSource.AI_IMPORT, priority: FilePriority.NORMAL, tags: ['配置'], content: 'export default {}', metadata: { size: '4 KB' }, createdAt: base, updatedAt: base },
@@ -18,4 +18,14 @@ export const mockKnowledgeFiles: KnowledgeFile[] = [
   { id: 'kfile-14', spaceId: 'space-inbox', title: '临时方案', type: 'note', source: FileSource.MANUAL_UPLOAD, priority: FilePriority.NORMAL, tags: ['待整理'], content: 'Draft', metadata: { size: '2 KB' }, createdAt: base, updatedAt: base },
   { id: 'kfile-15', spaceId: 'space-inbox', title: '错误日志', type: 'code', source: FileSource.AUTO_COLLECT, priority: FilePriority.CRITICAL, tags: ['报错'], content: 'Error: timeout', metadata: { size: '1 KB' }, createdAt: base, updatedAt: base },
 ]
+export const mockKnowledgeFiles: KnowledgeFile[] = rawKnowledgeFiles.map((file, index) => ({
+  ...file,
+  type: file.type as KnowledgeFile['type'],
+  starred: index < 3,
+  verified: index % 3 === 0,
+  verifiedAt: index % 3 === 0 ? base : undefined,
+  accessCount: Math.max(1, 15 - index),
+  lastAccessedAt: base,
+  aiSummary: index < 5 ? { status: AISummaryStatus.COMPLETED, content: `${file.title} 的 AI 摘要：已提炼关键内容与操作要点。`, generatedAt: base } : undefined,
+}))
 export const MOCK_FILES = mockKnowledgeFiles

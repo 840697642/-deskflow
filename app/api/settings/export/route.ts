@@ -1,0 +1,1 @@
+import { NextRequest } from 'next/server'; import { jsonSuccess } from '@/lib/api/response'; import { getMockStore } from '@/lib/mock-store'; export async function GET(r:NextRequest){return jsonSuccess(r,{settings:getMockStore().settings,projectSettings:getMockStore().projectSettings})}

@@ -18,6 +18,10 @@ import type {
   TaskStatus,
   UpdateTaskRequest,
 } from './types/task'
+import type { ChatModel, ChatSession } from './types/chat'
+import type { LogEntry } from './types/logs'
+import type { Skill } from './types/skills'
+import type { SettingsResponse } from './types/settings'
 
 const API_SCHEMA_VERSION = '1.0'
 const DEFAULT_ACTOR = 'claude-code'
@@ -79,9 +83,9 @@ export type CreateTaskInput = CreateTaskRequest
 export type UpdateTaskInput = UpdateTaskRequest
 export type KnowledgeDocQuery = { limit?: number; pinned?: boolean }
 export type KnowledgeSpaceQuery = { type?: 'project' | 'general' }
-export type KnowledgeFileQuery = { spaceId?: string; priority?: FilePriority; tag?: string[]; folderId?: string; sort?: 'priority' | 'updatedAt' }
-export type KnowledgeErrorQuery = { spaceId?: string; status?: string; severity?: string; sort?: 'severity' | 'lastOccurredAt' }
-export type KnowledgeConversationQuery = { spaceId?: string; tool?: string; hasErrors?: boolean; summarized?: boolean }
+export type KnowledgeFileQuery = { spaceId?: string; priority?: FilePriority; tag?: string[]; folderId?: string; sort?: 'smart' | 'recent' | 'priority' | 'title' | 'updatedAt'; page?: number; limit?: number }
+export type KnowledgeErrorQuery = { spaceId?: string; status?: string; severity?: string; sort?: 'severity' | 'lastOccurredAt'; page?: number; limit?: number }
+export type KnowledgeConversationQuery = { spaceId?: string; tool?: string; hasErrors?: boolean; summarized?: boolean; page?: number; limit?: number }
 export type KnowledgeFolderQuery = { spaceId?: string; parentId?: string }
 
 type RequestInitWithBody = RequestInit & { body?: string }
@@ -350,7 +354,7 @@ export async function fetchKnowledgeSpaces(options?: ApiClientOptions): Promise<
 }
 
 export async function fetchKnowledgeFiles(params?: KnowledgeFileQuery, options?: ApiClientOptions): Promise<KnowledgeFile[]> {
-  return requestJson<KnowledgeFile[]>(`/api/knowledge/files${queryString({ spaceId: params?.spaceId, priority: params?.priority, tag: params?.tag?.join(','), folderId: params?.folderId, sort: params?.sort })}`, {}, options)
+  const result = await requestJson<KnowledgeFile[] | { data: KnowledgeFile[] }>(`/api/knowledge/files${queryString({ spaceId: params?.spaceId, priority: params?.priority, tag: params?.tag?.join(','), folderId: params?.folderId, sort: params?.sort, page: params?.page?.toString(), limit: params?.limit?.toString() })}`, {}, options); return Array.isArray(result) ? result : result.data
 }
 
 export async function updateKnowledgeFile(id: string, input: Partial<Pick<KnowledgeFile, 'spaceId' | 'folderId' | 'title' | 'tags' | 'priority'>>, meta?: MutationInput, options?: ApiClientOptions): Promise<KnowledgeFile> {
@@ -362,7 +366,7 @@ export async function summarizeKnowledgeFile(id: string, meta?: MutationInput, o
 }
 
 export async function fetchKnowledgeErrors(params?: KnowledgeErrorQuery, options?: ApiClientOptions): Promise<ErrorEntry[]> {
-  return requestJson<ErrorEntry[]>(`/api/knowledge/errors${queryString({ spaceId: params?.spaceId, status: params?.status, severity: params?.severity, sort: params?.sort })}`, {}, options)
+  const result = await requestJson<ErrorEntry[] | { data: ErrorEntry[] }>(`/api/knowledge/errors${queryString({ spaceId: params?.spaceId, status: params?.status, severity: params?.severity, sort: params?.sort, page: params?.page?.toString(), limit: params?.limit?.toString() })}`, {}, options); return Array.isArray(result) ? result : result.data
 }
 
 export async function updateKnowledgeError(id: string, input: Partial<Pick<ErrorEntry, 'title' | 'solution' | 'status' | 'severity'>>, meta?: MutationInput, options?: ApiClientOptions): Promise<ErrorEntry> {
@@ -370,8 +374,19 @@ export async function updateKnowledgeError(id: string, input: Partial<Pick<Error
 }
 
 export async function fetchKnowledgeConversations(params?: KnowledgeConversationQuery, options?: ApiClientOptions): Promise<KnowledgeConversation[]> {
-  return requestJson<KnowledgeConversation[]>(`/api/knowledge/conversations${queryString({ spaceId: params?.spaceId, tool: params?.tool, hasErrors: params?.hasErrors?.toString(), summarized: params?.summarized?.toString() })}`, {}, options)
+  const result = await requestJson<KnowledgeConversation[] | { data: KnowledgeConversation[] }>(`/api/knowledge/conversations${queryString({ spaceId: params?.spaceId, tool: params?.tool, hasErrors: params?.hasErrors?.toString(), summarized: params?.summarized?.toString(), page: params?.page?.toString(), limit: params?.limit?.toString() })}`, {}, options); return Array.isArray(result) ? result : result.data
 }
+
+export async function searchKnowledge(query: string, params?: { spaceId?: string; limit?: number }, options?: ApiClientOptions) {
+  return requestJson<{ type: string; results: unknown[]; total: number }>(`/api/knowledge/search${queryString({ q: query, spaceId: params?.spaceId, limit: params?.limit?.toString() })}`, {}, options)
+}
+
+export async function fetchChatModels(options?: ApiClientOptions): Promise<ChatModel[]> { return requestJson<ChatModel[]>('/api/chat/models', {}, options) }
+export async function fetchChatSessions(spaceId?: string, options?: ApiClientOptions): Promise<ChatSession[]> { return requestJson<ChatSession[]>(`/api/chat/sessions${queryString({ spaceId })}`, {}, options) }
+export async function createChatSession(input: Pick<ChatSession, 'spaceId' | 'model' | 'mode' | 'contexts'>, meta?: MutationInput, options?: ApiClientOptions): Promise<ChatSession> { return requestJson<ChatSession>('/api/chat/sessions', { method: 'POST', body: jsonBody(mutationBody(input, meta)) }, options) }
+export async function fetchSkills(options?: ApiClientOptions): Promise<Skill[]> { return requestJson<Skill[]>('/api/skills', {}, options) }
+export async function fetchLogs(options?: ApiClientOptions): Promise<LogEntry[]> { return requestJson<LogEntry[]>('/api/logs', {}, options) }
+export async function fetchSettings(scope?: string, options?: ApiClientOptions): Promise<SettingsResponse> { return requestJson<SettingsResponse>(`/api/settings${queryString({ scope })}`, {}, options) }
 
 export async function summarizeKnowledgeConversation(id: string, meta?: MutationInput, options?: ApiClientOptions): Promise<KnowledgeConversation> {
   return requestJson<KnowledgeConversation>(`/api/knowledge/conversations/${encodePathSegment(id)}/summarize`, { method: 'POST', body: jsonBody(mutationBody({}, meta)) }, options)

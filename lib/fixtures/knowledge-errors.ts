@@ -1,7 +1,7 @@
 import type { ErrorEntry } from '@/lib/types/knowledge'
 import { ErrorSeverity, ErrorStatus } from '@/lib/types/knowledge'
 const t = '2026-09-04T10:00:00Z'
-export const mockKnowledgeErrors: ErrorEntry[] = [
+const rawKnowledgeErrors = [
   { id: 'kerr-1', spaceId: 'space-ai-video', title: '模型超时', errorMessage: 'Error: model request timeout', severity: ErrorSeverity.CRITICAL, reproductionPath: '运行视频生成', status: ErrorStatus.UNRESOLVED, occurrenceCount: 3, relatedFileIds: [], firstOccurredAt: t, lastOccurredAt: t },
   { id: 'kerr-2', spaceId: 'space-ai-video', title: '文件未找到', errorMessage: 'Exception: file not found', severity: ErrorSeverity.HIGH, reproductionPath: '导出视频', solution: '检查路径', status: ErrorStatus.RESOLVED, occurrenceCount: 2, relatedFileIds: ['kfile-1'], firstOccurredAt: t, lastOccurredAt: t, resolvedAt: t },
   { id: 'kerr-3', spaceId: 'space-game-dev', title: '空引用', errorMessage: 'Cannot read properties of undefined', severity: ErrorSeverity.MEDIUM, reproductionPath: '打开关卡', status: ErrorStatus.UNRESOLVED, occurrenceCount: 1, relatedFileIds: [], firstOccurredAt: t, lastOccurredAt: t },
@@ -11,4 +11,14 @@ export const mockKnowledgeErrors: ErrorEntry[] = [
   { id: 'kerr-7', spaceId: 'space-daily-learn', title: '网络失败', errorMessage: 'Failed: network request', severity: ErrorSeverity.LOW, reproductionPath: '请求 API', status: ErrorStatus.UNRESOLVED, occurrenceCount: 2, relatedFileIds: [], firstOccurredAt: t, lastOccurredAt: t },
   { id: 'kerr-8', spaceId: 'space-inbox', title: '未定义变量', errorMessage: 'undefined is not a function', severity: ErrorSeverity.HIGH, reproductionPath: '运行脚本', status: ErrorStatus.ARCHIVED, occurrenceCount: 1, relatedFileIds: [], firstOccurredAt: t, lastOccurredAt: t },
 ]
+export const mockKnowledgeErrors: ErrorEntry[] = rawKnowledgeErrors.map((entry) => ({
+  ...entry,
+  signature: entry.errorMessage.replace(/[^a-z]+/gi, ' ').trim().toLowerCase(),
+  contexts: Array.from({ length: entry.occurrenceCount }, (_, index) => ({
+    message: entry.errorMessage,
+    reproductionPath: entry.reproductionPath,
+    context: index === 0 ? '首次记录' : `第 ${index + 1} 次出现`,
+    occurredAt: new Date(Date.parse(t) - index * 86_400_000).toISOString(),
+  })),
+}))
 export const MOCK_ERRORS = mockKnowledgeErrors
