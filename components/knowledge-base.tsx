@@ -491,13 +491,6 @@ export default function KnowledgeBase({ onToast }: { onToast: (t: Omit<Toast, 'i
     void loadData()
   }, [loadData])
 
-  if (loading && spaces.length === 0) {
-    return <EmptyState icon={RefreshCw} title="正在加载知识库" description="正在读取空间、文件和对话数据。" />
-  }
-  if (loadError && spaces.length === 0) {
-    return <EmptyState icon={RefreshCw} title="知识库暂时不可用" description={loadError} action={<Button variant="primary" onClick={() => void loadData()}>重试</Button>} />
-  }
-
   const space = spaces.find((s) => s.id === spaceId) ?? spaces[0] ?? SPACES[0]
   const spaceFolders = useMemo(() => folders.filter((f) => f.spaceId === spaceId), [folders, spaceId])
   const spaceFiles = useMemo(() => files.filter((f) => f.spaceId === spaceId), [files, spaceId])
@@ -614,6 +607,8 @@ export default function KnowledgeBase({ onToast }: { onToast: (t: Omit<Toast, 'i
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+      {loading && <div role="status" className="col-span-full rounded-lg bg-muted px-4 py-3 text-[13px] text-muted-foreground">正在同步知识库数据…</div>}
+      {loadError && <div role="alert" className="col-span-full flex items-center justify-between gap-4 rounded-lg bg-destructive/8 px-4 py-3 text-[13px] text-destructive"><span>{loadError}</span><Button variant="primary" onClick={() => void loadData()}>重试</Button></div>}
       {/* ================= 左栏：空间 + 目录树 ================= */}
       <div className="flex flex-col gap-6 lg:sticky lg:top-0">
         <section aria-label="知识空间" className="overflow-hidden rounded-lg bg-card shadow-sm">
