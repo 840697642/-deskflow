@@ -1,0 +1,7 @@
+import { NextRequest } from 'next/server'
+import { jsonError, jsonStoredSuccess, successBody } from '@/lib/api/response'
+import { getMockStore, getMutation, mutationKey, saveMutation } from '@/lib/mock-store'
+import { KnowledgeRouteContext, mutationMeta, parseObject } from '@/lib/knowledge-api'
+import { AISummaryStatus } from '@/lib/types/knowledge'
+export const dynamic = 'force-dynamic'; type Ctx = KnowledgeRouteContext<{ id: string }>
+export async function POST(request: NextRequest, context: Ctx) { const { id } = await context.params; const store = getMockStore(); const item = store.knowledgeConversations.find((conversation) => conversation.id === id); if (!item) return jsonError(request, 404, 'CONVERSATION_NOT_FOUND', '对话不存在', false, { id }); const parsed = await parseObject(request); if (parsed.error) return parsed.error; const meta = mutationMeta(parsed.value!); const key = mutationKey(`knowledge-conversations:summarize:${id}:${meta.actor}`, meta.clientMutationId); const previous = getMutation(store, key); if (previous) return jsonStoredSuccess(previous.body, previous.status); const now = new Date().toISOString(); item.summary = { status: AISummaryStatus.COMPLETED, content: item.messages.map((message) => message.content).join(' ').slice(0, 200), keyPoints: item.messages.slice(0, 3).map((message) => message.content.slice(0, 80)), generatedAt: now }; const response = successBody(request, item); saveMutation(store, key, 200, response); return jsonStoredSuccess(response, 200) }

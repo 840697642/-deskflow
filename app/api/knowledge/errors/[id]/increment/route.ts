@@ -1,0 +1,6 @@
+import { NextRequest } from 'next/server'
+import { jsonError, jsonStoredSuccess, successBody } from '@/lib/api/response'
+import { getMockStore, getMutation, mutationKey, saveMutation } from '@/lib/mock-store'
+import { KnowledgeRouteContext, mutationMeta, parseObject } from '@/lib/knowledge-api'
+export const dynamic = 'force-dynamic'; type Ctx = KnowledgeRouteContext<{ id: string }>
+export async function POST(request: NextRequest, context: Ctx) { const { id } = await context.params; const store = getMockStore(); const entry = store.knowledgeErrors.find((item) => item.id === id); if (!entry) return jsonError(request, 404, 'ERROR_NOT_FOUND', '错题不存在', false, { id }); const parsed = await parseObject(request); if (parsed.error) return parsed.error; const meta = mutationMeta(parsed.value!); const key = mutationKey(`knowledge-errors:increment:${id}:${meta.actor}`, meta.clientMutationId); const previous = getMutation(store, key); if (previous) return jsonStoredSuccess(previous.body, previous.status); entry.occurrenceCount += 1; entry.lastOccurredAt = new Date().toISOString(); const response = successBody(request, entry); saveMutation(store, key, 200, response); return jsonStoredSuccess(response, 200) }

@@ -1,0 +1,7 @@
+import { NextRequest } from 'next/server'
+import { jsonError, jsonStoredSuccess, successBody } from '@/lib/api/response'
+import { getMockStore, getMutation, mutationKey, saveMutation } from '@/lib/mock-store'
+import { KnowledgeRouteContext, mutationMeta, parseObject } from '@/lib/knowledge-api'
+import { AISummaryStatus, type KnowledgeFile } from '@/lib/types/knowledge'
+export const dynamic = 'force-dynamic'; type Ctx = KnowledgeRouteContext<{ id: string }>
+export async function POST(request: NextRequest, context: Ctx) { const { id } = await context.params; const store = getMockStore(); const file = store.knowledgeFiles.find((item) => item.id === id); if (!file) return jsonError(request, 404, 'FILE_NOT_FOUND', '知识库文件不存在', false, { id }); const parsed = await parseObject(request); if (parsed.error) return parsed.error; const meta = mutationMeta(parsed.value!); const key = mutationKey(`knowledge-files:summarize:${id}:${meta.actor}`, meta.clientMutationId); const previous = getMutation(store, key); if (previous) return jsonStoredSuccess(previous.body, previous.status); const updated: KnowledgeFile = { ...file, aiSummary: { status: AISummaryStatus.COMPLETED, content: file.content.slice(0, 200), generatedAt: new Date().toISOString() }, updatedAt: new Date().toISOString() }; store.knowledgeFiles[store.knowledgeFiles.indexOf(file)] = updated; const response = successBody(request, updated); saveMutation(store, key, 200, response); return jsonStoredSuccess(response, 200) }
