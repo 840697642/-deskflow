@@ -386,7 +386,7 @@ export async function fetchChatModels(options?: ApiClientOptions): Promise<ChatM
 export async function fetchChatSessions(spaceId?: string, options?: ApiClientOptions): Promise<ChatSession[]> { return requestJson<ChatSession[]>(`/api/chat/sessions${queryString({ spaceId })}`, {}, options) }
 export async function createChatSession(input: Pick<ChatSession, 'spaceId' | 'model' | 'mode' | 'contexts'>, meta?: MutationInput, options?: ApiClientOptions): Promise<ChatSession> { return requestJson<ChatSession>('/api/chat/sessions', { method: 'POST', body: jsonBody(mutationBody(input, meta)) }, options) }
 export async function fetchSkills(options?: ApiClientOptions): Promise<Skill[]> { return requestJson<Skill[]>('/api/skills', {}, options) }
-export async function fetchLogs(options?: ApiClientOptions): Promise<LogEntry[]> { return requestJson<LogEntry[]>('/api/logs', {}, options) }
+export async function fetchLogs(params?: { includeDebug?: boolean }, options?: ApiClientOptions): Promise<LogEntry[]> { return requestJson<LogEntry[]>(`/api/logs${queryString({ include_debug: params?.includeDebug ? '1' : undefined })}`, {}, options) }
 export async function fetchSettings(scope?: string, options?: ApiClientOptions): Promise<SettingsResponse> { return requestJson<SettingsResponse>(`/api/settings${queryString({ scope })}`, {}, options) }
 export async function fetchToolConnection(tool: ToolId, options?: ApiClientOptions): Promise<ToolConnection> { return requestJson<ToolConnection>(`/api/tools/${encodePathSegment(tool)}/connection`, {}, options) }
 export async function fetchStudioCards(tool: ToolId, options?: ApiClientOptions): Promise<StudioCardModel[]> { return requestJson<StudioCardModel[]>(`/api/studios/${encodePathSegment(tool)}/cards`, {}, options) }

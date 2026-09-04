@@ -153,7 +153,7 @@ function toNdjson(entries: LogEntry[]) {
   return entries
     .map((e) =>
       JSON.stringify({
-        ts: `2026-09-04T${e.ts}+08:00`,
+        ts: e.ts.includes('T') ? e.ts : `2026-09-04T${e.ts}+08:00`,
         level: e.level,
         category: e.category,
         traceId: e.traceId,
@@ -219,7 +219,7 @@ function TreeRow({ node, depth, selectedId, onSelect, expanded, toggle, errorOnl
           <ChevronRight className={cn('size-3.5 transition-transform duration-150', open && 'rotate-90')} aria-hidden="true" />
         </button>
         <button type="button" onClick={() => onSelect(e)} className={cn('flex min-w-0 flex-1 items-center gap-3 py-1.5 pr-3 text-left', FOCUS_RING)}>
-          <span className="w-[86px] shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">{e.ts.slice(0, 8)}</span>
+          <span className="w-[86px] shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">{formatLogTime(e.ts)}</span>
           <LevelPill level={e.level} />
           <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span className={cn('min-w-24 flex-1 truncate text-[13px]', e.level === 'debug' ? 'text-muted-foreground' : 'text-foreground', !e.read && e.level !== 'debug' && 'font-medium')}>{e.message}</span>
@@ -252,6 +252,13 @@ function parseLogTime(ts: string): [number, number] {
   return [Number.isFinite(hour) ? hour : 0, Number.isFinite(minute) ? minute : 0]
 }
 
+function formatLogTime(ts: string): string {
+  const [hour, minute] = parseLogTime(ts)
+  const match = ts.match(/^(?:\d{4}-\d{2}-\d{2}T)?\d{1,2}:\d{2}:(\d{2})/)
+  const second = match ? Number(match[1]) : 0
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(Number.isFinite(second) ? second : 0).padStart(2, '0')}`
+}
+
 function TimeBrush({ entries, range, onChange }: { entries: LogEntry[]; range: [number, number] | null; onChange: (r: [number, number] | null) => void }) {
   const buckets = useMemo(() => {
     const b: Record<number, Record<LogLevel, number>> = {}
@@ -270,11 +277,13 @@ function TimeBrush({ entries, range, onChange }: { entries: LogEntry[]; range: [
         {buckets.map((b, i) => {
           const total = Object.values(b).reduce((a, c) => a + c, 0)
           const inRange = !range || (i >= range[0] && i <= range[1])
+          const bucketMinute = 9 * 60 + i * 10
+          const bucketLabel = `${String(Math.floor(bucketMinute / 60)).padStart(2, '0')}:${String(bucketMinute % 60).padStart(2, '0')}`
           return (
             <button
               key={i}
               type="button"
-              aria-label={`09:${String(i * 10).padStart(2, '0')} 起 · ${total} 条`}
+              aria-label={`${bucketLabel} 起 · ${total} 条`}
               aria-pressed={!!range && inRange}
               onClick={() => onChange(range && range[0] === i && range[1] === i ? null : [i, i])}
               className={cn('flex flex-1 flex-col justify-end overflow-hidden rounded-sm transition-opacity duration-150 hover:opacity-100', FOCUS_RING, inRange ? 'opacity-100' : 'opacity-30')}
@@ -312,7 +321,7 @@ interface LogCenterProps {
 export default function LogCenter({ onToast, onExplainWithAi, onOpenJob }: LogCenterProps) {
   const [mode, setMode] = useState<Mode>('tree')
   const [logs, setLogs] = useState<LogEntry[]>(MOCK_LOGS)
-  useEffect(() => { void fetchLogs().then((items) => setLogs(items as LogEntry[])).catch(() => undefined) }, [])
+  useEffect(() => { void fetchLogs({ includeDebug: true }).then((items) => setLogs(items as LogEntry[])).catch(() => undefined) }, [])
   const [levels, setLevels] = useState<Set<LogLevel>>(new Set(['bug', 'warn', 'notice', 'info', 'debug']))
   const [categories, setCategories] = useState<Set<LogCategory>>(new Set(Object.keys(CATEGORY_META) as LogCategory[]))
   const [sources, setSources] = useState<Set<LogSource>>(new Set(['app', 'video', 'game', 'system']))
@@ -439,7 +448,7 @@ export default function LogCenter({ onToast, onExplainWithAi, onOpenJob }: LogCe
         </div>
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[224px_minmax(0,1fr)] xl:grid-cols-[224px_minmax(0,1fr)_320px]">
+      <div className="grid items-start gap-4 lg:grid-cols-[224px_minmax(0,1fr)] 2xl:grid-cols-[224px_minmax(360px,1fr)_320px]">
         {/* ===== 左：来源树 + 类别 + 时间刷 ===== */}
         <aside className="flex flex-col gap-4">
           <section className="rounded-lg bg-card p-3 shadow-sm">
