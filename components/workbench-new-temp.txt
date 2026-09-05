@@ -1,0 +1,100 @@
+'use client'
+
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
+import {
+  AppWindow,
+  ArrowRight,
+  Bell,
+  BookOpen,
+  CalendarDays,
+  CircleAlert,
+  CircleCheck,
+  Clapperboard,
+  Cloud,
+  ExternalLink,
+  FileCode2,
+  FileSpreadsheet,
+  FileText,
+  FolderKanban,
+  Gamepad2,
+  GitCommitHorizontal,
+  HardDrive,
+  History,
+  Hourglass,
+  Info,
+  KanbanSquare,
+  LayoutDashboard,
+  ListTodo,
+  Loader2,
+  Lock,
+  Megaphone,
+  MessageSquareMore,
+  Pause,
+  PanelRight,
+  Pin,
+  PinOff,
+  Play,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  ScrollText,
+  Search,
+  Settings,
+  Sparkles,
+  TriangleAlert,
+  WifiOff,
+  X,
+  type LucideProps,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import KnowledgeBase from '@/components/knowledge-base'
+import AiChatPanel, { type ChatContext } from '@/components/ai-chat-panel'
+import SettingsView from '@/components/settings-view'
+import LogCenter from '@/components/log-center'
+import SkillLibrary from '@/components/skill-library'
+import VideoStudio from '@/components/video-studio'
+import GameStudio from '@/components/game-studio'
+import AppStudio from '@/components/app-studio'
+import PlanInbox, { type AcceptPayload } from '@/components/plan-inbox'
+import { ToolTimeShare, UsageBreakdown, UsageSummary, totalFor } from '@/components/usage-overview'
+import type { InboxItem as CreationInboxItem, StudioCardModel, ToolConn, ToolId, ToolTimeDay, Usage } from '@/components/creation-shared'
+import {
+  ApiError,
+  cancelJob as cancelJobApi,
+  fetchJobs,
+  fetchModules,
+  fetchTasks,
+  fetchWorkbenchSummary,
+  pauseJob as pauseJobApi,
+  reconnectModule as reconnectModuleApi,
+  resumeJob as resumeJobApi,
+  retryJob as retryJobApi,
+  acceptInboxItem,
+  createInboxItem,
+  dismissInboxItem,
+  fetchInboxItems,
+  fetchStudioCards,
+  fetchToolConnection,
+  fetchToolTimeStats,
+  fetchUsageRecords,
+  saveCardAsError,
+  updateTask as updateTaskApi,
+} from '@/lib/api-client'
+import {
+  adaptJob,
+  adaptModule,
+  adaptTask,
+  adaptWorkbenchSummaryToAnnouncements,
+  aggregateProjects,
+} from '@/lib/adapters/workbench-adapter'
+import { TaskStatus as BackendTaskStatus } from '@/lib/types/task'
+import type { ToolConnection } from '@/lib/types/creation-tools'
+
+// =============================================================================
+// 类型定义（占位类型，后续可直接替换为真实 API 响应类型）
+// =============================================================================
+
+export type IconType = ComponentType<LucideProps>
+
+export type JobStatus =
+  | 'running'
