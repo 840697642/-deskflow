@@ -1,0 +1,4 @@
+import type { ChatSession, ChatModel } from '@/lib/types/chat'
+const t = '2026-09-04T10:00:00Z'
+export const mockChatModels: ChatModel[] = [{ id: 'anthropic/claude-sonnet', label: 'Claude Sonnet', provider: 'Anthropic', kind: 'api', available: true, latencyMs: 800, tier: 'mid' }, { id: 'ollama/qwen2.5-coder:14b', label: 'Qwen Coder', provider: 'Ollama', kind: 'local', available: false, tier: 'free' }]
+export const mockChatSessions: ChatSession[] = Array.from({ length: 3 }, (_, i) => ({ id: `chat-${i + 1}`, spaceId: i === 0 ? 'global' : 'space-app-dev', title: `AI 会话 ${i + 1}`, model: mockChatModels[0].id, mode: i === 2 ? 'agent' : 'chat', contexts: [], messages: [{ id: `msg-${i + 1}`, role: 'assistant', content: '已准备好协助你。', status: i === 2 ? 'failed' : 'done', createdAt: t, toolCalls: i === 1 ? [{ name: 'search', input: '{}', output: '完成', status: 'done' }] : undefined }], pinned: i === 0, updatedAt: t }))

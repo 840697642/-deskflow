@@ -1,0 +1,1 @@
+import { NextRequest } from 'next/server'; import { jsonSuccess } from '@/lib/api/response'; export async function POST(r:NextRequest){return jsonSuccess(r,{id:`diag-${crypto.randomUUID()}`,status:'ready'})}

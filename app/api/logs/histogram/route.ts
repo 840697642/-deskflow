@@ -1,0 +1,1 @@
+import { NextRequest } from 'next/server'; import { jsonSuccess } from '@/lib/api/response'; import { getMockStore } from '@/lib/mock-store'; export async function GET(r:NextRequest){const counts=getMockStore().logs.reduce<Record<string,number>>((a,x)=>(a[x.level]=(a[x.level]??0)+1,a),{});return jsonSuccess(r,{bucket:new URL(r.url).searchParams.get('bucket')??'5m',counts})}

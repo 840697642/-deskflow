@@ -1,0 +1,1 @@
+import { NextRequest } from 'next/server'; import { jsonSuccess } from '@/lib/api/response'; import { getMockStore } from '@/lib/mock-store'; export async function GET(r:NextRequest){const logs=getMockStore().logs;return jsonSuccess(r,{ok:true,services:{api:true},errors24h:logs.filter(x=>x.level==='bug').length})}

@@ -24,12 +24,17 @@ export interface KnowledgeFile {
   type: KnowledgeFileType
   source: FileSource
   priority: FilePriority
+  starred: boolean
   tags: string[]
   aiSummary?: { status: AISummaryStatus; content?: string; generatedAt?: string }
   content: string
   metadata: { size: string; author?: string; relatedConversationId?: string }
+  verified: boolean
+  verifiedAt?: string
+  accessCount: number
   createdAt: string
   updatedAt: string
+  lastAccessedAt: string
 }
 
 export enum ErrorSeverity { CRITICAL = 'critical', HIGH = 'high', MEDIUM = 'medium', LOW = 'low' }
@@ -39,11 +44,13 @@ export interface ErrorEntry {
   spaceId: string
   title: string
   errorMessage: string
+  signature: string
   severity: ErrorSeverity
   reproductionPath: string
   solution?: string
   status: ErrorStatus
   occurrenceCount: number
+  contexts: Array<{ message: string; reproductionPath: string; context?: string; occurredAt: string }>
   relatedConversationId?: string
   relatedFileIds: string[]
   firstOccurredAt: string

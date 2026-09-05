@@ -8,6 +8,7 @@ import type {
 } from './types/common'
 import type { AuthCallbackRequest, AuthCallbackResponse, AuthRequirement } from './types/auth'
 import type { KnowledgeDoc } from './types/knowledge-doc'
+import type { ApiKey, ApiKeyScope, Conversation as KnowledgeConversation, ErrorEntry, FilePriority, Folder, KnowledgeFile, Space } from './types/knowledge'
 import type { Job, JobAction, JobControlRequest, JobInputRequirement, JobStatus } from './types/job'
 import type { ModuleHealth, ModuleHealthStatus } from './types/module'
 import type {
@@ -17,6 +18,11 @@ import type {
   TaskStatus,
   UpdateTaskRequest,
 } from './types/task'
+import type { ChatModel, ChatSession } from './types/chat'
+import type { LogEntry } from './types/logs'
+import type { Skill } from './types/skills'
+import type { SettingsResponse } from './types/settings'
+import type { AcceptInboxPayload, CreateInboxItemPayload, InboxItem, SaveAsErrorPayload, StudioCardModel, ToolConnection, ToolId, ToolTimeDay, UsageRecord } from './types/creation-tools'
 
 const API_SCHEMA_VERSION = '1.0'
 const DEFAULT_ACTOR = 'claude-code'
@@ -77,6 +83,11 @@ export type MutationInput = Partial<MutationMetadata>
 export type CreateTaskInput = CreateTaskRequest
 export type UpdateTaskInput = UpdateTaskRequest
 export type KnowledgeDocQuery = { limit?: number; pinned?: boolean }
+export type KnowledgeSpaceQuery = { type?: 'project' | 'general' }
+export type KnowledgeFileQuery = { spaceId?: string; priority?: FilePriority; tag?: string[]; folderId?: string; sort?: 'smart' | 'recent' | 'priority' | 'title' | 'updatedAt'; page?: number; limit?: number }
+export type KnowledgeErrorQuery = { spaceId?: string; status?: string; severity?: string; sort?: 'severity' | 'lastOccurredAt'; page?: number; limit?: number }
+export type KnowledgeConversationQuery = { spaceId?: string; tool?: string; hasErrors?: boolean; summarized?: boolean; page?: number; limit?: number }
+export type KnowledgeFolderQuery = { spaceId?: string; parentId?: string }
 
 type RequestInitWithBody = RequestInit & { body?: string }
 
@@ -337,6 +348,74 @@ export async function pinKnowledgeDoc(id: string, pinned: boolean, meta?: Mutati
     method: 'POST',
     body: jsonBody(mutationBody({ pinned }, meta)),
   }, options)
+}
+
+export async function fetchKnowledgeSpaces(options?: ApiClientOptions): Promise<Space[]> {
+  return requestJson<Space[]>('/api/knowledge/spaces', {}, options)
+}
+
+export async function fetchKnowledgeFiles(params?: KnowledgeFileQuery, options?: ApiClientOptions): Promise<KnowledgeFile[]> {
+  const result = await requestJson<KnowledgeFile[] | { data: KnowledgeFile[] }>(`/api/knowledge/files${queryString({ spaceId: params?.spaceId, priority: params?.priority, tag: params?.tag?.join(','), folderId: params?.folderId, sort: params?.sort, page: params?.page?.toString(), limit: params?.limit?.toString() })}`, {}, options); return Array.isArray(result) ? result : result.data
+}
+
+export async function updateKnowledgeFile(id: string, input: Partial<Pick<KnowledgeFile, 'spaceId' | 'folderId' | 'title' | 'tags' | 'priority'>>, meta?: MutationInput, options?: ApiClientOptions): Promise<KnowledgeFile> {
+  return requestJson<KnowledgeFile>(`/api/knowledge/files/${encodePathSegment(id)}`, { method: 'PATCH', body: jsonBody(mutationBody(input, meta)) }, options)
+}
+
+export async function summarizeKnowledgeFile(id: string, meta?: MutationInput, options?: ApiClientOptions): Promise<KnowledgeFile> {
+  return requestJson<KnowledgeFile>(`/api/knowledge/files/${encodePathSegment(id)}/summarize`, { method: 'POST', body: jsonBody(mutationBody({}, meta)) }, options)
+}
+
+export async function fetchKnowledgeErrors(params?: KnowledgeErrorQuery, options?: ApiClientOptions): Promise<ErrorEntry[]> {
+  const result = await requestJson<ErrorEntry[] | { data: ErrorEntry[] }>(`/api/knowledge/errors${queryString({ spaceId: params?.spaceId, status: params?.status, severity: params?.severity, sort: params?.sort, page: params?.page?.toString(), limit: params?.limit?.toString() })}`, {}, options); return Array.isArray(result) ? result : result.data
+}
+
+export async function updateKnowledgeError(id: string, input: Partial<Pick<ErrorEntry, 'title' | 'solution' | 'status' | 'severity'>>, meta?: MutationInput, options?: ApiClientOptions): Promise<ErrorEntry> {
+  return requestJson<ErrorEntry>(`/api/knowledge/errors/${encodePathSegment(id)}`, { method: 'PATCH', body: jsonBody(mutationBody(input, meta)) }, options)
+}
+
+export async function fetchKnowledgeConversations(params?: KnowledgeConversationQuery, options?: ApiClientOptions): Promise<KnowledgeConversation[]> {
+  const result = await requestJson<KnowledgeConversation[] | { data: KnowledgeConversation[] }>(`/api/knowledge/conversations${queryString({ spaceId: params?.spaceId, tool: params?.tool, hasErrors: params?.hasErrors?.toString(), summarized: params?.summarized?.toString(), page: params?.page?.toString(), limit: params?.limit?.toString() })}`, {}, options); return Array.isArray(result) ? result : result.data
+}
+
+export async function searchKnowledge(query: string, params?: { spaceId?: string; limit?: number }, options?: ApiClientOptions) {
+  return requestJson<{ type: string; results: unknown[]; total: number }>(`/api/knowledge/search${queryString({ q: query, spaceId: params?.spaceId, limit: params?.limit?.toString() })}`, {}, options)
+}
+
+export async function fetchChatModels(options?: ApiClientOptions): Promise<ChatModel[]> { return requestJson<ChatModel[]>('/api/chat/models', {}, options) }
+export async function fetchChatSessions(spaceId?: string, options?: ApiClientOptions): Promise<ChatSession[]> { return requestJson<ChatSession[]>(`/api/chat/sessions${queryString({ spaceId })}`, {}, options) }
+export async function createChatSession(input: Pick<ChatSession, 'spaceId' | 'model' | 'mode' | 'contexts'>, meta?: MutationInput, options?: ApiClientOptions): Promise<ChatSession> { return requestJson<ChatSession>('/api/chat/sessions', { method: 'POST', body: jsonBody(mutationBody(input, meta)) }, options) }
+export async function fetchSkills(options?: ApiClientOptions): Promise<Skill[]> { return requestJson<Skill[]>('/api/skills', {}, options) }
+export async function fetchLogs(params?: { includeDebug?: boolean }, options?: ApiClientOptions): Promise<LogEntry[]> { return requestJson<LogEntry[]>(`/api/logs${queryString({ include_debug: params?.includeDebug ? '1' : undefined })}`, {}, options) }
+export async function fetchSettings(scope?: string, options?: ApiClientOptions): Promise<SettingsResponse> { return requestJson<SettingsResponse>(`/api/settings${queryString({ scope })}`, {}, options) }
+export async function fetchToolConnection(tool: ToolId, options?: ApiClientOptions): Promise<ToolConnection> { return requestJson<ToolConnection>(`/api/tools/${encodePathSegment(tool)}/connection`, {}, options) }
+export async function fetchStudioCards(tool: ToolId, options?: ApiClientOptions): Promise<StudioCardModel[]> { return requestJson<StudioCardModel[]>(`/api/studios/${encodePathSegment(tool)}/cards`, {}, options) }
+export async function fetchInboxItems(params?: { status?: string }, options?: ApiClientOptions): Promise<InboxItem[]> { return requestJson<InboxItem[]>(`/api/inbox${queryString({ status: params?.status })}`, {}, options) }
+export async function createInboxItem(input: CreateInboxItemPayload, meta?: MutationInput, options?: ApiClientOptions): Promise<InboxItem> { return requestJson<InboxItem>('/api/inbox', { method: 'POST', body: jsonBody(mutationBody(input, meta)) }, options) }
+export async function acceptInboxItem(id: string, input: AcceptInboxPayload, meta?: MutationInput, options?: ApiClientOptions): Promise<{ id: string; column: string; priority: string; project: string; title: string }> { return requestJson(`/api/inbox/${encodePathSegment(id)}/accept`, { method: 'POST', body: jsonBody(mutationBody(input, meta)) }, options) }
+export async function dismissInboxItem(id: string, meta?: MutationInput, options?: ApiClientOptions): Promise<InboxItem> { return requestJson<InboxItem>(`/api/inbox/${encodePathSegment(id)}/dismiss`, { method: 'POST', body: jsonBody(mutationBody({}, meta)) }, options) }
+export async function fetchUsageRecords(params?: { from?: string; to?: string; tool?: ToolId }, options?: ApiClientOptions): Promise<UsageRecord[]> { return requestJson<UsageRecord[]>(`/api/usage${queryString({ from: params?.from, to: params?.to, tool: params?.tool })}`, {}, options) }
+export async function fetchToolTimeStats(params?: { days?: number }, options?: ApiClientOptions): Promise<ToolTimeDay[]> { return requestJson<ToolTimeDay[]>(`/api/usage/time${queryString({ days: params?.days?.toString() })}`, {}, options) }
+export async function saveCardAsError(input: SaveAsErrorPayload, meta?: MutationInput, options?: ApiClientOptions): Promise<ErrorEntry> { return requestJson<ErrorEntry>('/api/errors', { method: 'POST', body: jsonBody(mutationBody(input, meta)) }, options) }
+
+export async function summarizeKnowledgeConversation(id: string, meta?: MutationInput, options?: ApiClientOptions): Promise<KnowledgeConversation> {
+  return requestJson<KnowledgeConversation>(`/api/knowledge/conversations/${encodePathSegment(id)}/summarize`, { method: 'POST', body: jsonBody(mutationBody({}, meta)) }, options)
+}
+
+export async function archiveKnowledgeConversation(id: string, targetSpaceId: string, meta?: MutationInput, options?: ApiClientOptions): Promise<KnowledgeConversation> {
+  return requestJson<KnowledgeConversation>(`/api/knowledge/conversations/${encodePathSegment(id)}/archive`, { method: 'POST', body: jsonBody(mutationBody({ targetSpaceId }, meta)) }, options)
+}
+
+export async function fetchKnowledgeFolders(params?: KnowledgeFolderQuery, options?: ApiClientOptions): Promise<Folder[]> {
+  return requestJson<Folder[]>(`/api/knowledge/folders${queryString({ spaceId: params?.spaceId, parentId: params?.parentId })}`, {}, options)
+}
+
+export async function fetchKnowledgeApiKeys(options?: ApiClientOptions): Promise<ApiKey[]> {
+  return requestJson<ApiKey[]>('/api/knowledge/api-keys', {}, options)
+}
+
+export async function createKnowledgeApiKey(input: { name: string; scopes: ApiKeyScope[]; spaceId?: string }, meta?: MutationInput, options?: ApiClientOptions): Promise<ApiKey> {
+  return requestJson<ApiKey>('/api/knowledge/api-keys', { method: 'POST', body: jsonBody(mutationBody(input, meta)) }, options)
 }
 
 export async function fetchInspector(type: InspectorType, id: string, options?: ApiClientOptions): Promise<InspectorResponse> {

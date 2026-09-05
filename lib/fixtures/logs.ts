@@ -1,0 +1,4 @@
+import type { LogEntry } from '@/lib/types/logs'
+const levels = ['bug', 'warn', 'notice', 'info', 'debug'] as const
+export const mockLogs: LogEntry[] = Array.from({ length: 25 }, (_, i) => ({ id: `log-${i + 1}`, ts: new Date(Date.parse('2026-09-04T10:00:00Z') - i * 60000).toISOString(), level: levels[i % levels.length], category: (['call', 'task', 'permission', 'system', 'user', 'collect'] as const)[i % 6], traceId: `trace-${Math.floor(i / 5) + 1}`, parentId: i % 5 === 0 ? undefined : `log-${i - (i % 5) + 1}`, projectId: (['app', 'video', 'game', 'system'] as const)[i % 4], event: i % 3 ? 'model.call' : 'file.write', message: `示例日志 ${i + 1}`, data: { index: i }, durationMs: i * 10, notified: levels[i % levels.length] === 'bug' || levels[i % levels.length] === 'warn', read: i % 3 !== 0, handledBy: i % 4 === 0 ? 'manual' : undefined, repeat: i % 7 === 0 ? 2 : undefined }))
+export const MOCK_LOGS = mockLogs
