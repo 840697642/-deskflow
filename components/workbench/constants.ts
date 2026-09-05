@@ -171,6 +171,13 @@ export const DOC_KIND_ICON: Record<'doc' | 'code' | 'sheet', IconType> = {
   sheet: FileSpreadsheet,
 }
 
+// 公告色调映射
+export const ANN_TONE: Record<'info' | 'warning' | 'success', Tone> = {
+  info: 'info',
+  warning: 'warning',
+  success: 'success',
+}
+
 // =============================================================================
 // 开发日志
 // =============================================================================

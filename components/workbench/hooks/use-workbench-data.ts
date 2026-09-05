@@ -12,7 +12,7 @@ import {
   adaptTask,
   aggregateProjects,
   adaptWorkbenchSummaryToAnnouncements,
-} from '@/lib/workbench-adapters'
+} from '@/lib/adapters/workbench-adapter'
 import type { Job, Service, Project, PlanCard, Announcement } from '../types'
 
 interface UseWorkbenchDataOptions {

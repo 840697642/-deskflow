@@ -1,50 +1,22 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
-  AppWindow,
   ArrowRight,
   Bell,
-  BookOpen,
-  CalendarDays,
-  CircleAlert,
-  CircleCheck,
-  Clapperboard,
-  Cloud,
-  ExternalLink,
   FileCode2,
   FileSpreadsheet,
   FileText,
-  FolderKanban,
-  Gamepad2,
   GitCommitHorizontal,
   HardDrive,
-  History,
-  Hourglass,
-  Info,
-  KanbanSquare,
-  LayoutDashboard,
-  ListTodo,
-  Loader2,
-  Lock,
   Megaphone,
   MessageSquareMore,
-  Pause,
   PanelRight,
   Pin,
   PinOff,
-  Play,
   Plus,
   RefreshCw,
-  RotateCcw,
-  ScrollText,
   Search,
-  Settings,
-  Sparkles,
-  TriangleAlert,
-  WifiOff,
-  X,
-  type LucideProps,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import KnowledgeBase from '@/components/knowledge-base'
@@ -90,719 +62,80 @@ import {
 import { TaskStatus as BackendTaskStatus } from '@/lib/types/task'
 import type { ToolConnection } from '@/lib/types/creation-tools'
 
-// =============================================================================
-// 类型定义（占位类型，后续可直接替换为真实 API 响应类型）
-// =============================================================================
+// 导入所有提取的模块
+import type {
+  Job,
+  Service,
+  Project,
+  Announcement,
+  KnowledgeDoc,
+  PlanCard,
+  PlanColumn,
+  View,
+  Filter,
+  WorkbenchProps,
+  Toast,
+  ConfirmState,
+  Domain,
+  IconType,
+} from './workbench/types'
 
-export type IconType = ComponentType<LucideProps>
+import {
+  NAV_VIEW,
+  PLAN_COLUMNS,
+  FILTERS,
+  TONE_BAR,
+  TONE_BADGE,
+  TONE_TEXT,
+  ANN_TONE,
+  FOCUS_RING,
+  STATUS_META,
+  DOMAIN_META,
+  PRIORITY_META,
+  DOC_KIND_ICON,
+  TODAY,
+  VIEW_META,
+} from './workbench/constants'
 
-export type JobStatus =
-  | 'running'
-  | 'queued'
-  | 'paused'
-  | 'waiting_input'
-  | 'failed'
-  | 'permission_required'
-  | 'success'
-  | 'loading'
+import { MOCK_NAV, MOCK_DOCS } from '@/lib/fixtures/workbench-mocks'
 
-export type ServiceStatus = 'online' | 'offline' | 'degraded' | 'permission_required' | 'loading'
+import {
+  Button,
+  IconButton,
+  StatusBadge,
+  EmptyState,
+  SectionHeader,
+  ProgressBar,
+  Skeleton,
+  Dialog,
+  ConfirmDialog,
+  ToastStack,
+} from './workbench/components'
 
-export type Domain = 'video' | 'game' | 'app' | 'chat' | 'knowledge' | 'skill'
+import { useWorkbenchData, useToast, useCreationTools } from './workbench/hooks'
+import { FocusView, QueueView } from './workbench/views'
 
-export interface Job {
-  id: string
-  name: string
-  project: string
-  domain: Domain
-  status: JobStatus
-  step: string
-  progress?: number // 0-100，可选
-  heartbeat: string // 相对时间文案，占位
-  heartbeatStale?: boolean // 心跳超时
-  startedAt: string
-  eta?: string // 预计完成时间（占位）
-  note?: string // 状态说明 / 下一步动作
-  logs: string[]
+// 重新导出供其他组件使用
+export {
+  Button,
+  IconButton,
+  StatusBadge,
+  EmptyState,
+  SectionHeader,
+  ProgressBar,
+  Skeleton,
+  Dialog,
+  ConfirmDialog,
+  ToastStack,
+  TONE_BAR,
+  TONE_BADGE,
+  TONE_TEXT,
+  FOCUS_RING,
 }
 
-export interface Service {
-  id: string
-  name: string
-  scope: 'local' | 'cloud'
-  status: ServiceStatus
-  detail: string
-  actionLabel?: string
-}
+export type { IconType, Toast, Tone } from './workbench/types'
 
-export interface Project {
-  id: string
-  name: string
-  domain: Domain
-  updatedAt: string
-  activeJobs: number
-}
-
-/** 跑马灯公告 */
-export interface Announcement {
-  id: string
-  text: string
-  tone: 'info' | 'warning' | 'success'
-  pinned: boolean
-  publishedAt: string
-}
-
-/** 知识库文档 */
-export interface KnowledgeDoc {
-  id: string
-  title: string
-  kind: 'doc' | 'code' | 'sheet'
-  project: string
-  updatedAt: string
-  size: string
-  pinned: boolean
-}
-
-/** 计划看板卡片 */
-export type PlanColumn = 'todo' | 'doing' | 'done'
-export interface PlanCard {
-  id: string
-  title: string
-  project: string
-  domain: Domain
-  due: string
-  priority: 'high' | 'medium' | 'low'
-  column: PlanColumn
-}
-
-export interface WorkbenchProps {
-  onDataLoaded?: (counts: { tasks: number; jobs: number; modules: number }) => void
-}
-
-/** 轻提示 */
-export interface Toast {
-  id: number
-  title: string
-  description?: string
-  tone: 'success' | 'info' | 'warning' | 'danger'
-}
-
-interface NavItem {
-  id: string
-  label: string
-  icon: IconType
-  badge?: number
-}
-
-interface NavSection {
-  title: string
-  items: NavItem[]
-}
-
-// =============================================================================
-// Mock 数据（集中放置，便于后续抽离替换）
-// =============================================================================
-
-const MOCK_NAV: NavSection[] = [
-  {
-    title: '工作空间',
-    items: [
-      { id: 'workbench', label: '今日焦点', icon: LayoutDashboard },
-      { id: 'queue', label: '任务队列', icon: ListTodo, badge: 4 },
-      { id: 'plan', label: '计划看板', icon: KanbanSquare },
-      { id: 'projects', label: '项目', icon: FolderKanban },
-      { id: 'services', label: '服务', icon: HardDrive },
-    ],
-  },
-  {
-    title: '创作工具',
-    items: [
-      { id: 'video', label: 'AI 视频', icon: Clapperboard },
-      { id: 'game', label: '鸿蒙游戏', icon: Gamepad2 },
-      { id: 'app', label: '应用开发', icon: AppWindow },
-      { id: 'knowledge', label: '知识库', icon: BookOpen },
-      { id: 'skills', label: '技能', icon: Sparkles },
-    ],
-  },
-  {
-    title: '系统',
-    items: [
-      { id: 'logs', label: '日志', icon: ScrollText },
-      { id: 'settings', label: '设置', icon: Settings },
-      { id: 'changelog', label: '开发日志', icon: History },
-    ],
-  },
-]
-
-const MOCK_JOBS: Job[] = [
-  {
-    id: 'job-1042',
-    name: '《山海拾遗》第 3 集分镜渲染',
-    project: '山海拾遗',
-    domain: 'video',
-    status: 'running',
-    step: '渲染镜头 14 / 22',
-    progress: 63,
-    heartbeat: '8 秒前',
-    startedAt: '10:42',
-    eta: '11:40',
-    logs: [
-      '[10:42:03] 任务开始，加载分镜脚本 v7',
-      '[10:44:18] 镜头 01-08 渲染完成',
-      '[10:51:02] 镜头 09-13 渲染完成',
-      '[10:57:40] 正在渲染镜头 14，采样步数 30/50',
-    ],
-  },
-  {
-    id: 'job-1041',
-    name: '鸿蒙 ArkTS 编译 · 关卡编辑器',
-    project: '星尘塔防',
-    domain: 'game',
-    status: 'waiting_input',
-    step: '等待选择签名证书',
-    heartbeat: '2 分钟前',
-    startedAt: '10:31',
-    note: '需要选择用于 HAP 包签名的证书后才能继续。',
-    logs: ['[10:31:10] hvigor 构建开始', '[10:36:55] 构建完成，等待签名证书'],
-  },
-  {
-    id: 'job-1040',
-    name: '知识库向量化 · 鸿蒙 API 文档',
-    project: '共享知识库',
-    domain: 'knowledge',
-    status: 'paused',
-    step: '已处理 1,280 / 3,400 个片段',
-    progress: 38,
-    heartbeat: '14 分钟前',
-    heartbeatStale: true,
-    startedAt: '09:58',
-    note: '由用户手动暂停。',
-    logs: ['[09:58:00] 开始切分文档', '[10:12:31] 已写入 1,280 个向量', '[10:12:35] 用户暂停任务'],
-  },
-  {
-    id: 'job-1039',
-    name: '云端配音合成 · 第 2 集旁白',
-    project: '山海拾遗',
-    domain: 'video',
-    status: 'permission_required',
-    step: '等待授权云 TTS 服务',
-    heartbeat: '—',
-    startedAt: '10:20',
-    note: '云 TTS 访问令牌已过期，请重新授权后任务将自动继续。',
-    logs: ['[10:20:12] 提交合成请求', '[10:20:13] 401：访问令牌已过期'],
-  },
-  {
-    id: 'job-1038',
-    name: '记账应用 · 单元测试',
-    project: '轻记账',
-    domain: 'app',
-    status: 'failed',
-    step: '3 个测试失败',
-    progress: 100,
-    heartbeat: '26 分钟前',
-    startedAt: '09:40',
-    note: 'LedgerService.spec.ts 断言失败，查看日志了解详情。',
-    logs: ['[09:40:02] 运行 128 个测试用例', '[09:46:10] ✕ LedgerService › 应正确汇总月度支出', '[09:46:11] 测试结束：125 通过，3 失败'],
-  },
-  {
-    id: 'job-1037',
-    name: '技能「分镜脚本生成」评估',
-    project: '技能库',
-    domain: 'skill',
-    status: 'queued',
-    step: '排队中 · 第 2 位',
-    heartbeat: '—',
-    startedAt: '—',
-    logs: [],
-  },
-  {
-    id: 'job-1036',
-    name: '资产导出 · 角色贴图打包',
-    project: '星尘塔防',
-    domain: 'game',
-    status: 'success',
-    step: '已导出 42 个文件',
-    progress: 100,
-    heartbeat: '1 小时前',
-    startedAt: '08:55',
-    logs: ['[08:55:00] 开始打包', '[09:02:14] 导出完成，共 42 个文件 (186 MB)'],
-  },
-  {
-    id: 'job-loading',
-    name: '',
-    project: '',
-    domain: 'chat',
-    status: 'loading',
-    step: '',
-    heartbeat: '',
-    startedAt: '',
-    logs: [],
-  },
-]
-
-const MOCK_SERVICES: Service[] = [
-  { id: 'svc-1', name: '本地渲染引擎', scope: 'local', status: 'online', detail: 'GPU 使用率 72% · 显存 9.4 / 12 GB' },
-  {
-    id: 'svc-2',
-    name: 'DevEco 构建服务',
-    scope: 'local',
-    status: 'offline',
-    detail: '未检测到进程。请启动 DevEco Studio 后重连。',
-    actionLabel: '重新连接',
-  },
-  { id: 'svc-3', name: '本地模型 (Ollama)', scope: 'local', status: 'degraded', detail: '响应延迟 4.8s，高于 2s 阈值' },
-  {
-    id: 'svc-4',
-    name: '云端 TTS',
-    scope: 'cloud',
-    status: 'permission_required',
-    detail: '访问令牌已过期，需要重新授权。',
-    actionLabel: '重新授权',
-  },
-  { id: 'svc-5', name: '云端对话模型', scope: 'cloud', status: 'online', detail: '今日已用 38,200 tokens' },
-  { id: 'svc-6', name: '对象存储同步', scope: 'cloud', status: 'loading', detail: '正在检查连接…' },
-]
-
-const MOCK_PROJECTS: Project[] = [
-  { id: 'p-1', name: '山海拾遗', domain: 'video', updatedAt: '刚刚', activeJobs: 2 },
-  { id: 'p-2', name: '星尘塔防', domain: 'game', updatedAt: '5 分钟前', activeJobs: 1 },
-  { id: 'p-3', name: '轻记账', domain: 'app', updatedAt: '26 分钟前', activeJobs: 0 },
-  { id: 'p-4', name: '共享知识库', domain: 'knowledge', updatedAt: '14 分钟前', activeJobs: 1 },
-]
-
-const MOCK_ANNOUNCEMENTS: Announcement[] = [
-  { id: 'a-1', text: '本周六 02:00–04:00 云端渲染集群例行维护，期间云渲染任务将自动排队。', tone: 'warning', pinned: true, publishedAt: '今天 09:00' },
-  { id: 'a-2', text: '鸿蒙 NEXT API 12 文档已同步至知识库，向量化完成后即可检索。', tone: 'info', pinned: true, publishedAt: '昨天 18:30' },
-  { id: 'a-3', text: '新技能「分镜脚本生成 v2」已上线，支持多角色对白。', tone: 'success', pinned: false, publishedAt: '昨天 14:00' },
-  { id: 'a-4', text: '本地模型 Ollama 建议升级到 0.6.x 以修复长上下文延迟问题。', tone: 'info', pinned: false, publishedAt: '3 天前' },
-]
-
-const MOCK_DOCS: KnowledgeDoc[] = [
-  { id: 'd-1', title: '鸿蒙 ArkTS 编码规范 v3', kind: 'doc', project: '共享知识库', updatedAt: '2 小时前', size: '48 KB', pinned: true },
-  { id: 'd-2', title: '《山海拾遗》世界观设定集', kind: 'doc', project: '山海拾遗', updatedAt: '昨天', size: '1.2 MB', pinned: true },
-  { id: 'd-3', title: 'HAP 签名与发布流程', kind: 'doc', project: '星尘塔防', updatedAt: '3 天前', size: '22 KB', pinned: true },
-  { id: 'd-4', title: 'LedgerService 测试用例矩阵', kind: 'sheet', project: '轻记账', updatedAt: '26 分钟前', size: '96 KB', pinned: false },
-  { id: 'd-5', title: '分镜提示词模板库', kind: 'code', project: '技能库', updatedAt: '5 小时前', size: '14 KB', pinned: false },
-  { id: 'd-6', title: '云 TTS 音色对照表', kind: 'sheet', project: '山海拾遗', updatedAt: '1 周前', size: '31 KB', pinned: false },
-]
-
-const MOCK_PLAN: PlanCard[] = [
-  { id: 'pl-1', title: '第 4 集分镜脚本定稿', project: '山海拾遗', domain: 'video', due: '9 月 5 日', priority: 'high', column: 'todo' },
-  { id: 'pl-2', title: '接入华为账号登录', project: '轻记账', domain: 'app', due: '9 月 8 日', priority: 'medium', column: 'todo' },
-  { id: 'pl-3', title: '技能评估基准集扩充', project: '技能库', domain: 'skill', due: '9 月 12 日', priority: 'low', column: 'todo' },
-  { id: 'pl-4', title: '关卡编辑器 HAP 签名发布', project: '星尘塔防', domain: 'game', due: '9 月 3 日', priority: 'high', column: 'doing' },
-  { id: 'pl-5', title: '鸿蒙 API 文档向量化', project: '共享知识库', domain: 'knowledge', due: '9 月 4 日', priority: 'medium', column: 'doing' },
-  { id: 'pl-6', title: '第 3 集分镜渲染', project: '山海拾遗', domain: 'video', due: '9 月 2 日', priority: 'high', column: 'doing' },
-  { id: 'pl-7', title: '角色贴图资产打包', project: '星尘塔防', domain: 'game', due: '9 月 1 日', priority: 'medium', column: 'done' },
-  { id: 'pl-8', title: '第 2 集旁白脚本', project: '山海拾遗', domain: 'video', due: '8 月 30 日', priority: 'low', column: 'done' },
-]
-
-const PLAN_COLUMNS: { id: PlanColumn; label: string; tone: Tone }[] = [
-  { id: 'todo', label: '待办', tone: 'muted' },
-  { id: 'doing', label: '进行中', tone: 'primary' },
-  { id: 'done', label: '已完成', tone: 'success' },
-]
-
-const PRIORITY_META: Record<PlanCard['priority'], { label: string; tone: Tone }> = {
-  high: { label: '高', tone: 'danger' },
-  medium: { label: '中', tone: 'warning' },
-  low: { label: '低', tone: 'muted' },
-}
-
-const DOC_KIND_ICON: Record<KnowledgeDoc['kind'], IconType> = {
-  doc: FileText,
-  code: FileCode2,
-  sheet: FileSpreadsheet,
-}
-
-// =============================================================================
-// 状态元数据：颜色 + 文本 + 图标 三者组合，绝不只依赖颜色
-// =============================================================================
-
-export type Tone = 'primary' | 'info' | 'warning' | 'success' | 'danger' | 'muted'
-
-/** 柔和的着色背景：用于提示条，不带边框 */
-export const TONE_BADGE: Record<Tone, string> = {
-  primary: 'bg-primary/8 text-primary',
-  info: 'bg-info/8 text-info',
-  warning: 'bg-warning/10 text-warning',
-  success: 'bg-success/10 text-success',
-  danger: 'bg-destructive/8 text-destructive',
-  muted: 'bg-muted text-muted-foreground',
-}
-
-export const TONE_TEXT: Record<Tone, string> = {
-  primary: 'text-primary',
-  info: 'text-info',
-  warning: 'text-warning',
-  success: 'text-success',
-  danger: 'text-destructive',
-  muted: 'text-muted-foreground',
-}
-
-export const TONE_BAR: Record<Tone, string> = {
-  primary: 'bg-primary',
-  info: 'bg-info',
-  warning: 'bg-warning',
-  success: 'bg-success',
-  danger: 'bg-destructive',
-  muted: 'bg-muted-foreground',
-}
-
-interface StatusMeta {
-  label: string
-  icon: IconType
-  tone: Tone
-  spin?: boolean
-}
-
-const STATUS_META: Record<JobStatus | ServiceStatus, StatusMeta> = {
-  running: { label: '运行中', icon: Loader2, tone: 'primary', spin: true },
-  queued: { label: '排队中', icon: Hourglass, tone: 'muted' },
-  paused: { label: '已暂停', icon: Pause, tone: 'warning' },
-  waiting_input: { label: '等待输入', icon: MessageSquareMore, tone: 'info' },
-  failed: { label: '失败', icon: CircleAlert, tone: 'danger' },
-  permission_required: { label: '需要授权', icon: Lock, tone: 'warning' },
-  success: { label: '已完成', icon: CircleCheck, tone: 'success' },
-  loading: { label: '加载中', icon: Loader2, tone: 'muted', spin: true },
-  online: { label: '在线', icon: CircleCheck, tone: 'success' },
-  offline: { label: '离线', icon: WifiOff, tone: 'danger' },
-  degraded: { label: '性能降级', icon: TriangleAlert, tone: 'warning' },
-}
-
-const DOMAIN_META: Record<Domain, { label: string; icon: IconType; className: string }> = {
-  video: { label: 'AI 视频', icon: Clapperboard, className: 'text-warning' },
-  game: { label: '鸿蒙游戏', icon: Gamepad2, className: 'text-technical' },
-  app: { label: '应用开发', icon: AppWindow, className: 'text-technical' },
-  chat: { label: 'AI 对话', icon: MessageSquareMore, className: 'text-muted-foreground' },
-  knowledge: { label: '知识库', icon: BookOpen, className: 'text-muted-foreground' },
-  skill: { label: '技能', icon: Sparkles, className: 'text-muted-foreground' },
-}
-
-type Filter = 'all' | 'running' | 'waiting_input' | 'failed' | 'success'
-
-const FILTERS: { id: Filter; label: string; match: (s: JobStatus) => boolean }[] = [
-  { id: 'all', label: '全部', match: () => true },
-  { id: 'running', label: '运行中', match: (s) => s === 'running' || s === 'paused' },
-  { id: 'waiting_input', label: '需处理', match: (s) => s === 'waiting_input' || s === 'permission_required' },
-  { id: 'failed', label: '失败', match: (s) => s === 'failed' },
-  { id: 'success', label: '已完成', match: (s) => s === 'success' },
-]
-
-// =============================================================================
-// 基础控件：统一的默认 / 悬停 / 键盘焦点 / 禁用 状态
-// =============================================================================
-
-export const FOCUS_RING =
-  'outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
-
-type ButtonVariant = 'primary' | 'outline' | 'ghost' | 'danger'
-
-export function Button({
-  variant = 'outline',
-  size = 'sm',
-  className,
-  children,
-  ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: 'sm' | 'md' }) {
-  const variants: Record<ButtonVariant, string> = {
-    primary: 'bg-primary text-primary-foreground border-transparent shadow-sm hover:bg-primary-hover',
-    outline: 'bg-transparent text-primary border-border hover:bg-muted',
-    ghost: 'bg-transparent text-foreground border-transparent hover:bg-muted',
-    danger: 'bg-transparent text-destructive border-transparent hover:bg-destructive/8',
-  }
-  return (
-    <button
-      type="button"
-      className={cn(
-        'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border font-medium transition-colors duration-150',
-        size === 'sm' ? 'h-9 px-3 text-[13px]' : 'h-10 px-4 text-[13px]',
-        'disabled:pointer-events-none disabled:opacity-40',
-        FOCUS_RING,
-        variants[variant],
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </button>
-  )
-}
-
-/** 图标按钮：必须带 tooltip 与 aria-label */
-export function IconButton({
-  label,
-  icon: Icon,
-  className,
-  active,
-  side = 'bottom',
-  ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  label: string
-  icon: IconType
-  active?: boolean
-  side?: 'bottom' | 'top' | 'left'
-}) {
-  const pos =
-    side === 'bottom'
-      ? 'top-full left-1/2 mt-1.5 -translate-x-1/2'
-      : side === 'top'
-        ? 'bottom-full left-1/2 mb-1.5 -translate-x-1/2'
-        : 'right-full top-1/2 mr-1.5 -translate-y-1/2'
-  return (
-    <span className="group relative inline-flex">
-      <button
-        type="button"
-        aria-label={label}
-        className={cn(
-          'inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground',
-          'disabled:pointer-events-none disabled:opacity-40',
-          FOCUS_RING,
-          active && 'bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground',
-          className,
-        )}
-        {...props}
-      >
-        <Icon className="size-4" aria-hidden="true" />
-      </button>
-      <span
-        role="tooltip"
-        className={cn(
-          'pointer-events-none absolute z-50 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[11px] text-card opacity-0 shadow-md transition-opacity duration-150',
-          'group-hover:opacity-100 group-focus-within:opacity-100',
-          pos,
-        )}
-      >
-        {label}
-      </span>
-    </span>
-  )
-}
-
-function StatusBadge({ status, className }: { status: JobStatus | ServiceStatus; className?: string }) {
-  const meta = STATUS_META[status]
-  const Icon = meta.icon
-  // 8px 状态圆点 + 文字 + 图标：绝不仅靠颜色传达状态
-  return (
-    <span className={cn('inline-flex h-6 items-center gap-2 text-[13px] font-medium whitespace-nowrap', TONE_TEXT[meta.tone], className)}>
-      <span aria-hidden="true" className={cn('size-2 shrink-0 rounded-full', TONE_BAR[meta.tone], meta.spin && 'animate-pulse')} />
-      {meta.label}
-      <Icon className={cn('size-3.5 opacity-70', meta.spin && 'animate-spin')} aria-hidden="true" />
-    </span>
-  )
-}
-
-function ProgressBar({ value, tone, label }: { value?: number; tone: Tone; label: string }) {
-  const indeterminate = value === undefined
-  return (
-    <div
-      role="progressbar"
-      aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={indeterminate ? undefined : value}
-      className="relative h-1 w-full overflow-hidden rounded-full bg-border/60"
-    >
-      <div
-        className={cn('h-full rounded-full transition-[width] duration-500', TONE_BAR[tone], indeterminate && 'w-1/3 opacity-40')}
-        style={indeterminate ? undefined : { width: `${value}%` }}
-      />
-    </div>
-  )
-}
-
-function Skeleton({ className }: { className?: string }) {
-  return <div aria-hidden="true" className={cn('animate-pulse rounded-md bg-muted', className)} />
-}
-
-export function EmptyState({ icon: Icon, title, description, action }: { icon: IconType; title: string; description: string; action?: ReactNode }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
-      <div className="mb-2 flex size-12 items-center justify-center rounded-[10px] bg-muted text-muted-foreground">
-        <Icon className="size-6" aria-hidden="true" />
-      </div>
-      <p className="text-base font-medium leading-snug text-foreground">{title}</p>
-      <p className="max-w-xs text-[13px] leading-relaxed text-muted-foreground text-pretty">{description}</p>
-      {action && <div className="mt-2">{action}</div>}
-    </div>
-  )
-}
-
-function SectionHeader({ title, count, children }: { title: string; count?: number; children?: ReactNode }) {
-  return (
-    <div className="flex h-16 items-center justify-between gap-4 px-6">
-      <h2 className="flex items-baseline gap-2 text-base font-medium leading-snug text-foreground">
-        {title}
-        {count !== undefined && <span className="text-[13px] font-normal tabular-nums text-muted-foreground">{count}</span>}
-      </h2>
-      {children}
-    </div>
-  )
-}
-
-// =============================================================================
-// 弹层：模态对话框 / 危险操作确认 / 轻提示 Toast
-// =============================================================================
-
-/** 通用模态容器：Esc 关闭、点击遮罩关闭、打开时聚焦 */
-export function Dialog({
-  open,
-  onClose,
-  title,
-  description,
-  icon: Icon,
-  tone = 'primary',
-  role = 'dialog',
-  width = 'md',
-  children,
-  footer,
-}: {
-  open: boolean
-  onClose: () => void
-  title: string
-  description?: string
-  icon?: IconType
-  tone?: Tone
-  role?: 'dialog' | 'alertdialog'
-  width?: 'sm' | 'md' | 'lg'
-  children?: ReactNode
-  footer?: ReactNode
-}) {
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    document.addEventListener('keydown', onKey)
-    panelRef.current?.focus()
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
-
-  if (!open) return null
-
-  const widths = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-2xl' }
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="absolute inset-0 bg-foreground/30 backdrop-blur-sm" aria-hidden="true" />
-      <div
-        ref={panelRef}
-        role={role}
-        aria-modal="true"
-        aria-labelledby="dialog-title"
-        aria-describedby={description ? 'dialog-desc' : undefined}
-        tabIndex={-1}
-        className={cn('relative flex w-full flex-col overflow-hidden rounded-xl bg-card shadow-lg outline-none', widths[width])}
-      >
-        <div className="flex items-start gap-4 px-6 pt-6">
-          {Icon && (
-            <span className={cn('flex size-10 shrink-0 items-center justify-center rounded-[10px]', TONE_BADGE[tone])}>
-              <Icon className="size-5" aria-hidden="true" />
-            </span>
-          )}
-          <div className="min-w-0 flex-1">
-            <h2 id="dialog-title" className="text-base font-medium leading-snug text-foreground">
-              {title}
-            </h2>
-            {description && (
-              <p id="dialog-desc" className="mt-1 text-[13px] leading-relaxed text-muted-foreground text-pretty">
-                {description}
-              </p>
-            )}
-          </div>
-          <IconButton label="关闭" icon={X} onClick={onClose} className="-mt-1 -mr-2" side="left" />
-        </div>
-        {children && <div className="px-6 pt-4">{children}</div>}
-        {footer && <div className="flex justify-end gap-2 px-6 pt-6 pb-6">{footer}</div>}
-      </div>
-    </div>
-  )
-}
-
-interface ConfirmState {
-  title: string
-  description: string
-  confirmLabel: string
-  onConfirm: () => void
-}
-
-function ConfirmDialog({ state, onClose }: { state: ConfirmState | null; onClose: () => void }) {
-  return (
-    <Dialog
-      open={state !== null}
-      onClose={onClose}
-      role="alertdialog"
-      width="sm"
-      icon={TriangleAlert}
-      tone="danger"
-      title={state?.title ?? ''}
-      description={state?.description}
-      footer={
-        <>
-          <Button variant="ghost" size="md" onClick={onClose}>
-            取消
-          </Button>
-          <Button
-            size="md"
-            className="border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            onClick={() => {
-              state?.onConfirm()
-              onClose()
-            }}
-          >
-            {state?.confirmLabel}
-          </Button>
-        </>
-      }
-    />
-  )
-}
-
-const TOAST_ICON: Record<Toast['tone'], IconType> = {
-  success: CircleCheck,
-  info: Info,
-  warning: TriangleAlert,
-  danger: CircleAlert,
-}
-
-function ToastStack({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: number) => void }) {
-  return (
-    <div aria-live="polite" aria-atomic="false" className="pointer-events-none fixed right-6 bottom-6 z-[60] flex w-80 flex-col gap-2">
-      {toasts.map((t) => {
-        const Icon = TOAST_ICON[t.tone]
-        const tone: Tone = t.tone
-        return (
-          <div
-            key={t.id}
-            role="status"
-            className="pointer-events-auto flex items-start gap-3 rounded-[10px] border border-foreground/[0.04] bg-card/95 p-4 shadow-lg backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200"
-          >
-            <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', TONE_BADGE[tone])}>
-              <Icon className="size-4" aria-hidden="true" />
-            </span>
-            <div className="min-w-0 flex-1 pt-0.5">
-              <p className="text-[13px] font-medium leading-snug text-foreground">{t.title}</p>
-              {t.description && <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground text-pretty">{t.description}</p>}
-            </div>
-            <button
-              type="button"
-              aria-label="关闭提示"
-              onClick={() => onDismiss(t.id)}
-              className={cn('-mt-1 -mr-1 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground', FOCUS_RING)}
-            >
-              <X className="size-3.5" aria-hidden="true" />
-            </button>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-// =============================================================================
-// 跑马灯公告条（置顶公告优先滚动）
-// =============================================================================
-
-const ANN_TONE: Record<Announcement['tone'], Tone> = { info: 'info', warning: 'warning', success: 'success' }
+type JobAction = 'pause' | 'resume' | 'cancel' | 'retry' | 'logs' | 'authorize' | 'input' | 'open'
 
 function Ticker({ items, onManage }: { items: Announcement[]; onManage: () => void }) {
   // 置顶在前；重复一份以实现无缝循环
@@ -962,172 +295,6 @@ function CommandBar({ current, inspectorOpen, onToggleInspector, chatOpen, onTog
 // =============================================================================
 
 type JobAction = 'pause' | 'resume' | 'cancel' | 'retry' | 'logs' | 'authorize' | 'input' | 'open'
-
-function JobRow({
-  job,
-  selected,
-  onSelect,
-  onAction,
-}: {
-  job: Job
-  selected: boolean
-  onSelect: () => void
-  onAction: (a: JobAction) => void
-}) {
-  // 加载态：与正常行等高，避免布局抖动
-  if (job.status === 'loading') {
-    return (
-      <li aria-busy="true" aria-label="任务加载中" className="grid h-20 grid-cols-[minmax(0,1fr)_120px_110px_248px] items-center gap-6 px-6">
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-3.5 w-56" />
-          <Skeleton className="h-3 w-32" />
-        </div>
-        <Skeleton className="h-3.5 w-16" />
-        <Skeleton className="h-3 w-16" />
-        <div className="flex justify-end gap-2">
-          <Skeleton className="h-9 w-16" />
-          <Skeleton className="h-9 w-16" />
-        </div>
-      </li>
-    )
-  }
-
-  const meta = STATUS_META[job.status]
-  const domain = DOMAIN_META[job.domain]
-  const DomainIcon = domain.icon
-  const showProgress = job.progress !== undefined || job.status === 'running'
-  const hasLogs = job.logs.length > 0
-
-  const stop = (e: React.MouseEvent) => e.stopPropagation()
-  const act = (a: JobAction) => (e: React.MouseEvent) => {
-    e.stopPropagation()
-    onAction(a)
-  }
-
-  return (
-    <li
-      className={cn(
-        'grid h-20 cursor-pointer grid-cols-[minmax(0,1fr)_120px_110px_248px] items-center gap-6 px-6 transition-colors duration-150 hover:bg-surface-raised',
-        selected && 'bg-accent/60 hover:bg-accent/60',
-      )}
-    >
-      <button
-        type="button"
-        onClick={onSelect}
-        aria-pressed={selected}
-        className={cn('flex min-w-0 flex-col gap-1 rounded-md text-left', FOCUS_RING)}
-      >
-        <span className="flex min-w-0 items-center gap-2">
-          <DomainIcon className={cn('size-4 shrink-0', domain.className)} aria-hidden="true" />
-          <span className="truncate text-[13px] font-medium text-foreground">{job.name}</span>
-        </span>
-        <span className="flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">
-          <span className="truncate">
-            {job.project} · {job.step}
-          </span>
-          {job.progress !== undefined && job.status !== 'success' && job.status !== 'failed' && (
-            <span className="tabular-nums">{job.progress}%</span>
-          )}
-        </span>
-        {showProgress && (
-          <span className="mt-0.5 block w-full max-w-xs">
-            <ProgressBar value={job.progress} tone={meta.tone} label={`${job.name} 进度`} />
-          </span>
-        )}
-      </button>
-
-      <div>
-        <StatusBadge status={job.status} />
-      </div>
-
-      <div className="flex flex-col gap-0.5" onClick={stop}>
-        <span className="text-[11px] text-muted-foreground">最近响应</span>
-        <span
-          title={job.heartbeatStale ? '任务已长时间未上报进度，可能卡住或掉线' : '任务最后一次上报“仍在运行”的时间'}
-          className={cn('flex items-center gap-1 text-[13px] tabular-nums', job.heartbeatStale ? 'font-medium text-warning' : 'text-foreground')}
-        >
-          {job.heartbeatStale && <TriangleAlert className="size-3" aria-label="长时间无响应" />}
-          {job.heartbeat}
-          {job.heartbeatStale && <span className="text-[11px] font-normal">无响应</span>}
-        </span>
-      </div>
-
-      <div className="flex justify-end gap-1" onClick={stop}>
-        {job.status === 'running' && (
-          <>
-            <Button onClick={act('pause')}>
-              <Pause className="size-3.5" aria-hidden="true" />
-              暂停
-            </Button>
-            <Button variant="danger" onClick={act('cancel')}>
-              <X className="size-3.5" aria-hidden="true" />
-              取消
-            </Button>
-          </>
-        )}
-        {job.status === 'paused' && (
-          <>
-            <Button variant="primary" onClick={act('resume')}>
-              <Play className="size-3.5" aria-hidden="true" />
-              继续
-            </Button>
-            <Button variant="danger" onClick={act('cancel')}>
-              <X className="size-3.5" aria-hidden="true" />
-              取消
-            </Button>
-          </>
-        )}
-        {job.status === 'waiting_input' && (
-          <>
-            <Button variant="primary" onClick={act('input')}>
-              <MessageSquareMore className="size-3.5" aria-hidden="true" />
-              提供输入
-            </Button>
-            <Button variant="danger" onClick={act('cancel')}>
-              <X className="size-3.5" aria-hidden="true" />
-              取消
-            </Button>
-          </>
-        )}
-        {job.status === 'permission_required' && (
-          <>
-            <Button variant="primary" onClick={act('authorize')}>
-              <Lock className="size-3.5" aria-hidden="true" />
-              去授权
-            </Button>
-            <Button variant="danger" onClick={act('cancel')}>
-              <X className="size-3.5" aria-hidden="true" />
-              取消
-            </Button>
-          </>
-        )}
-        {job.status === 'failed' && (
-          <Button variant="primary" onClick={act('retry')}>
-            <RotateCcw className="size-3.5" aria-hidden="true" />
-            重试
-          </Button>
-        )}
-        {job.status === 'queued' && (
-          <Button variant="danger" onClick={act('cancel')}>
-            <X className="size-3.5" aria-hidden="true" />
-            取消
-          </Button>
-        )}
-        {job.status === 'success' && (
-          <Button onClick={act('open')}>
-            <ExternalLink className="size-3.5" aria-hidden="true" />
-            打开结果
-          </Button>
-        )}
-        <IconButton label={hasLogs ? '查看日志' : '尚无日志'} icon={FileText} disabled={!hasLogs} onClick={act('logs')} side="left" />
-      </div>
-    </li>
-  )
-}
-
-// =============================================================================
-// 服务面板：在线 / 离线 / 降级 / 需要授权 / 加载中
-// =============================================================================
 
 function ServiceItem({ service, onAction }: { service: Service; onAction: () => void }) {
   const meta = STATUS_META[service.status]
@@ -1442,40 +609,6 @@ function KnowledgePanel({ docs, onTogglePin }: { docs: KnowledgeDoc[]; onToggleP
 // 视图切换：左侧导航驱动，每个视图一屏完成，避免纵向堆叠
 // =============================================================================
 
-type View = 'focus' | 'queue' | 'plan' | 'knowledge' | 'services' | 'projects' | 'changelog' | 'skills' | 'logs' | 'settings' | 'video' | 'game' | 'app'
-
-const NAV_VIEW: Record<string, View> = {
-  workbench: 'focus',
-  queue: 'queue',
-  plan: 'plan',
-  knowledge: 'knowledge',
-  services: 'services',
-  projects: 'projects',
-  changelog: 'changelog',
-  skills: 'skills',
-  logs: 'logs',
-  settings: 'settings',
-  video: 'video',
-  game: 'game',
-  app: 'app',
-}
-
-const VIEW_META: Record<View, { title: string; description: string }> = {
-  focus: { title: '今日焦点', description: '' },
-  queue: { title: '任务队列', description: '所有后台任务的状态、进度与操作。' },
-  plan: { title: '计划看板', description: '按待办 / 进行中 / 已完成管理近期计划。' },
-  knowledge: { title: '知识库', description: '置顶常用文件，快速回到最近更新的文档。' },
-  services: { title: '本地 / 云服务', description: '服务连接状态与需要处理的授权、重连。' },
-  projects: { title: '项目', description: '最近活跃的项目及其运行中的任务。' },
-  changelog: { title: '开发日志', description: '前端每次迭代的改动、数据契约与后端对接要点。' },
-  skills: { title: 'Skill 库', description: '管理可复用技能、效果展示与进化谱系。' },
-  logs: { title: '日志中心', description: '按来源、级别和链路查看运行日志。' },
-  settings: { title: '设置', description: '管理全局与项目作用域的模型、规则和通知。' },
-  video: { title: 'AI 视频工作室', description: '脚本、分镜与导演台的状态摘要。' },
-  game: { title: '鸿蒙游戏工作室', description: '引擎、问题阻塞与里程碑状态。' },
-  app: { title: '应用开发工作室', description: 'Bug、构建部署与依赖告警。' },
-}
-
 // =============================================================================
 // 开发日志：版本树 + 面向后端的契约说明
 // 每次前端迭代新增一个节点；contracts / actions 是后端对接时的直接依据
@@ -1730,432 +863,51 @@ function ChangelogView({ onToast }: { onToast: (t: Omit<Toast, 'id'>) => void })
 // 今日焦点：需要处理的事项 + 按时间段排列的时间线
 // -----------------------------------------------------------------------------
 
-/** 演示用的“今天”日期；接入后端后请改用真实日期 */
-const TODAY = { month: 9, day: 2, weekday: '星期三' }
-
-type Bucket = 'overdue' | 'today' | 'tomorrow' | 'week' | 'later'
-
-const BUCKET_META: Record<Bucket, { label: string; tone: Tone }> = {
-  overdue: { label: '已逾期', tone: 'danger' },
-  today: { label: '今天', tone: 'primary' },
-  tomorrow: { label: '明天', tone: 'info' },
-  week: { label: '本周', tone: 'muted' },
-  later: { label: '之后', tone: 'muted' },
-}
-
-const BUCKET_ORDER: Bucket[] = ['overdue', 'today', 'tomorrow', 'week', 'later']
-
-function bucketOf(due: string): Bucket {
-  const m = due.match(/(\d+)\s*月\s*(\d+)\s*日/)
-  if (!m) return 'later'
-  const month = Number(m[1])
-  const day = Number(m[2])
-  const offset = (month - TODAY.month) * 31 + (day - TODAY.day)
-  if (offset < 0) return 'overdue'
-  if (offset === 0) return 'today'
-  if (offset === 1) return 'tomorrow'
-  if (offset <= 6) return 'week'
-  return 'later'
-}
-
-interface TimelineItem {
-  id: string
-  kind: 'plan' | 'job'
-  title: string
-  project: string
-  domain: Domain
-  bucket: Bucket
-  meta: string
-  tone: Tone
-  jobId?: string
-}
-
-/** 需要处理的任务：失败 > 需授权 > 等待输入 > 无响应 */
-const ATTENTION_RANK: Partial<Record<JobStatus, number>> = { failed: 0, permission_required: 1, waiting_input: 2 }
-
-function FocusView({
-  jobs,
-  plan,
-  docs,
-  announcements,
-  services,
-  onJobAction,
-  onServiceAction,
-  onSelectJob,
-  onNavigate,
-  onTogglePinDoc,
-}: {
-  jobs: Job[]
-  plan: PlanCard[]
-  docs: KnowledgeDoc[]
-  announcements: Announcement[]
-  services: Service[]
-  onJobAction: (id: string, a: JobAction) => void
-  onServiceAction: (id: string) => void
-  onSelectJob: (id: string) => void
-  onNavigate: (v: View) => void
-  onTogglePinDoc: (id: string) => void
-}) {
-  const attentionJobs = useMemo(
-    () =>
-      jobs
-        .filter((j) => j.status !== 'loading' && (ATTENTION_RANK[j.status] !== undefined || j.heartbeatStale))
-        .sort((a, b) => (ATTENTION_RANK[a.status] ?? 3) - (ATTENTION_RANK[b.status] ?? 3)),
-    [jobs],
-  )
-  const attentionServices = services.filter((s) => s.status === 'offline' || s.status === 'permission_required' || s.status === 'degraded')
-
-  const timeline = useMemo(() => {
-    const items: TimelineItem[] = []
-    for (const j of jobs) {
-      if (j.status === 'running') {
-        items.push({
-          id: `job-${j.id}`,
-          kind: 'job',
-          title: j.name,
-          project: j.project,
-          domain: j.domain,
-          bucket: 'today',
-          meta: `${j.step}${j.progress !== undefined ? ` · ${j.progress}%` : ''}${j.eta ? ` · 预计 ${j.eta} 完成` : ''}`,
-          tone: 'primary',
-          jobId: j.id,
-        })
-      }
-    }
-    for (const c of plan) {
-      if (c.column === 'done') continue
-      const bucket = bucketOf(c.due)
-      items.push({
-        id: `plan-${c.id}`,
-        kind: 'plan',
-        title: c.title,
-        project: c.project,
-        domain: c.domain,
-        bucket,
-        meta: `${c.column === 'doing' ? '进行中' : '待办'} · 截止 ${c.due} · ${PRIORITY_META[c.priority].label}优先级`,
-        tone: bucket === 'overdue' ? 'danger' : PRIORITY_META[c.priority].tone,
-      })
-    }
-    return BUCKET_ORDER.map((b) => ({ bucket: b, items: items.filter((i) => i.bucket === b) })).filter((g) => g.items.length > 0)
-  }, [jobs, plan])
-
-  const pinnedDocs = docs.filter((d) => d.pinned)
-  const pinnedAnnouncements = announcements.filter((a) => a.pinned)
-
-  const primaryAction = (job: Job): { label: string; icon: IconType; action: JobAction } | null => {
-    switch (job.status) {
-      case 'failed':
-        return { label: '重试', icon: RotateCcw, action: 'retry' }
-      case 'permission_required':
-        return { label: '去授权', icon: Lock, action: 'authorize' }
-      case 'waiting_input':
-        return { label: '提供输入', icon: MessageSquareMore, action: 'input' }
-      case 'paused':
-        return { label: '继续', icon: Play, action: 'resume' }
-      default:
-        return null
-    }
-  }
-
-  return (
-    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_288px]">
-      <div className="flex min-w-0 flex-col gap-6">
-        {/* 需要你处理 */}
-        <section aria-labelledby="attention-heading" className="overflow-hidden rounded-lg bg-card shadow-sm">
-          <SectionHeader title="需要你处理" count={attentionJobs.length + attentionServices.length}>
-            <Button variant="ghost" onClick={() => onNavigate('queue')}>
-              全部任务
-              <ArrowRight className="size-3.5" aria-hidden="true" />
-            </Button>
-          </SectionHeader>
-          <span id="attention-heading" className="sr-only">
-            需要你处理
-          </span>
-          {attentionJobs.length === 0 && attentionServices.length === 0 ? (
-            <EmptyState icon={CircleCheck} title="暂无待处理事项" description="所有任务与服务运行正常。" />
-          ) : (
-            <ul className="divide-y divide-border/60 border-t border-border/60">
-              {attentionJobs.map((job) => {
-                const meta = STATUS_META[job.status]
-                const act = primaryAction(job)
-                const stale = job.heartbeatStale && ATTENTION_RANK[job.status] === undefined
-                return (
-                  <li key={job.id} className="flex min-h-16 items-center gap-4 px-6 py-3 transition-colors duration-150 hover:bg-surface-raised">
-                    <span aria-hidden="true" className={cn('size-2 shrink-0 rounded-full', stale ? TONE_BAR.warning : TONE_BAR[meta.tone])} />
-                    <button type="button" onClick={() => onSelectJob(job.id)} className={cn('min-w-0 flex-1 rounded-md text-left', FOCUS_RING)}>
-                      <span className="block truncate text-[13px] font-medium text-foreground">{job.name}</span>
-                      <span className="block truncate text-[11px] text-muted-foreground">
-                        <span className={cn('font-medium', stale ? 'text-warning' : TONE_TEXT[meta.tone])}>{stale ? '长时间无响应' : meta.label}</span>
-                        {' · '}
-                        {job.note ?? job.step}
-                      </span>
-                    </button>
-                    {act && (
-                      <Button variant="primary" onClick={() => onJobAction(job.id, act.action)}>
-                        <act.icon className="size-3.5" aria-hidden="true" />
-                        {act.label}
-                      </Button>
-                    )}
-                    <IconButton label="查看详情" icon={PanelRight} onClick={() => onSelectJob(job.id)} side="left" />
-                  </li>
-                )
-              })}
-              {attentionServices.map((s) => {
-                const meta = STATUS_META[s.status]
-                const ScopeIcon = s.scope === 'local' ? HardDrive : Cloud
-                return (
-                  <li key={s.id} className="flex min-h-16 items-center gap-4 px-6 py-3 transition-colors duration-150 hover:bg-surface-raised">
-                    <span aria-hidden="true" className={cn('size-2 shrink-0 rounded-full', TONE_BAR[meta.tone])} />
-                    <div className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5 text-[13px] font-medium text-foreground">
-                        <ScopeIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
-                        {s.name}
-                      </span>
-                      <span className="block truncate text-[11px] text-muted-foreground">
-                        <span className={cn('font-medium', TONE_TEXT[meta.tone])}>{meta.label}</span>
-                        {' · '}
-                        {s.detail}
-                      </span>
-                    </div>
-                    {s.actionLabel ? (
-                      <Button variant={s.status === 'permission_required' ? 'primary' : 'outline'} onClick={() => onServiceAction(s.id)}>
-                        {s.status === 'permission_required' ? <Lock className="size-3.5" aria-hidden="true" /> : <RefreshCw className="size-3.5" aria-hidden="true" />}
-                        {s.actionLabel}
-                      </Button>
-                    ) : (
-                      <Button variant="ghost" onClick={() => onNavigate('services')}>
-                        查看
-                      </Button>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </section>
-
-        {/* 时间线 */}
-        <section aria-labelledby="timeline-heading" className="overflow-hidden rounded-lg bg-card shadow-sm">
-          <SectionHeader title="时间线">
-            <Button variant="ghost" onClick={() => onNavigate('plan')}>
-              计划看板
-              <ArrowRight className="size-3.5" aria-hidden="true" />
-            </Button>
-          </SectionHeader>
-          <span id="timeline-heading" className="sr-only">
-            时间线
-          </span>
-          {timeline.length === 0 ? (
-            <EmptyState icon={CalendarDays} title="近期没有安排" description="在计划看板中新建计划，或启动任务后会出现在这里。" />
-          ) : (
-            <div className="flex flex-col gap-6 border-t border-border/60 px-6 py-6">
-              {timeline.map((group) => {
-                const bm = BUCKET_META[group.bucket]
-                return (
-                  <div key={group.bucket} className="grid grid-cols-[72px_minmax(0,1fr)] gap-4">
-                    <div className="flex flex-col items-start gap-1 pt-0.5">
-                      <span className={cn('text-[13px] font-medium', TONE_TEXT[bm.tone])}>{bm.label}</span>
-                      <span className="text-[11px] tabular-nums text-muted-foreground">{group.items.length} 项</span>
-                    </div>
-                    <ul className="relative flex flex-col gap-2 border-l border-border/60 pl-5">
-                      {group.items.map((item) => {
-                        const d = DOMAIN_META[item.domain]
-                        const DIcon = d.icon
-                        const inner = (
-                          <>
-                            <span aria-hidden="true" className={cn('absolute top-3.5 -left-[25px] size-2 rounded-full ring-4 ring-card', TONE_BAR[item.tone], item.kind === 'job' && 'animate-pulse')} />
-                            <span className="flex min-w-0 items-center gap-2">
-                              <DIcon className={cn('size-3.5 shrink-0', d.className)} aria-hidden="true" />
-                              <span className="truncate text-[13px] font-medium text-foreground">{item.title}</span>
-                            </span>
-                            <span className="block truncate text-[11px] text-muted-foreground">
-                              {item.project} · {item.meta}
-                            </span>
-                          </>
-                        )
-                        return (
-                          <li key={item.id} className="relative">
-                            {item.jobId ? (
-                              <button
-                                type="button"
-                                onClick={() => onSelectJob(item.jobId!)}
-                                className={cn('flex w-full flex-col gap-0.5 rounded-lg bg-muted/60 px-3 py-2 text-left transition-colors duration-150 hover:bg-muted', FOCUS_RING)}
-                              >
-                                {inner}
-                              </button>
-                            ) : (
-                              <div className="flex flex-col gap-0.5 rounded-lg px-3 py-2 transition-colors duration-150 hover:bg-surface-raised">{inner}</div>
-                            )}
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </section>
-      </div>
-
-      {/* 右栏：置顶文件 + 置顶公告 */}
-      <div className="flex flex-col gap-6">
-        <section aria-labelledby="pinned-docs-heading" className="overflow-hidden rounded-lg bg-card shadow-sm">
-          <div className="flex h-14 items-center justify-between gap-2 pr-3 pl-6">
-            <h2 id="pinned-docs-heading" className="flex items-center gap-2 text-[13px] font-medium text-foreground">
-              <Pin className="size-3.5 text-primary" aria-hidden="true" />
-              置顶文件
-              <span className="tabular-nums font-normal text-muted-foreground">{pinnedDocs.length}</span>
-            </h2>
-            <Button variant="ghost" className="h-8 px-2 text-[11px] text-muted-foreground" onClick={() => onNavigate('knowledge')}>
-              知识库
-              <ArrowRight className="size-3" aria-hidden="true" />
-            </Button>
-          </div>
-          {pinnedDocs.length === 0 ? (
-            <EmptyState icon={Pin} title="尚无置顶文件" description="在知识库中点击图钉，把常用文件固定在这里。" />
-          ) : (
-            <ul className="divide-y divide-border/60 border-t border-border/60">
-              {pinnedDocs.map((doc) => {
-                const Icon = DOC_KIND_ICON[doc.kind]
-                return (
-                  <li key={doc.id} className="flex min-h-12 items-center gap-3 py-2 pr-2 pl-6 transition-colors duration-150 hover:bg-surface-raised">
-                    <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                    <button type="button" className={cn('min-w-0 flex-1 rounded-md text-left', FOCUS_RING)}>
-                      <span className="block truncate text-[13px] font-medium text-foreground">{doc.title}</span>
-                      <span className="block truncate text-[11px] text-muted-foreground">{doc.project} · {doc.updatedAt}</span>
-                    </button>
-                    <IconButton label="取消置顶" icon={PinOff} onClick={() => onTogglePinDoc(doc.id)} side="left" className="size-8" />
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </section>
-
-        <section aria-labelledby="pinned-ann-heading" className="overflow-hidden rounded-lg bg-card shadow-sm">
-          <div className="flex h-14 items-center gap-2 px-6">
-            <h2 id="pinned-ann-heading" className="flex items-center gap-2 text-[13px] font-medium text-foreground">
-              <Megaphone className="size-3.5 text-primary" aria-hidden="true" />
-              置顶公告
-              <span className="tabular-nums font-normal text-muted-foreground">{pinnedAnnouncements.length}</span>
-            </h2>
-          </div>
-          {pinnedAnnouncements.length === 0 ? (
-            <EmptyState icon={Megaphone} title="暂无置顶公告" description="在公告管理中置顶的公告会显示在这里。" />
-          ) : (
-            <ul className="flex flex-col gap-2 border-t border-border/60 p-4">
-              {pinnedAnnouncements.map((a) => (
-                <li key={a.id} className={cn('flex gap-2.5 rounded-lg p-3 text-[13px] leading-relaxed text-pretty', TONE_BADGE[ANN_TONE[a.tone]])}>
-                  <span aria-hidden="true" className={cn('mt-2 size-1.5 shrink-0 rounded-full', TONE_BAR[ANN_TONE[a.tone]])} />
-                  <span>
-                    {a.text}
-                    <span className="mt-1 block text-[11px] opacity-70">{a.publishedAt}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-    </div>
-  )
-}
-
-// =============================================================================
-// 页面：工作台
-// =============================================================================
-
 export default function Workbench({ onDataLoaded }: WorkbenchProps = {}) {
   const [activeNav, setActiveNav] = useState('workbench')
   const view: View = NAV_VIEW[activeNav] ?? 'focus'
   const navigate = (v: View) => setActiveNav(Object.keys(NAV_VIEW).find((k) => NAV_VIEW[k] === v) ?? 'workbench')
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [services, setServices] = useState<Service[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
+
   const [selectedId, setSelectedId] = useState<string | undefined>()
   const [inspectorOpen, setInspectorOpen] = useState(true)
   const [chatOpen, setChatOpen] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
-
-  // 新增：公告 / 知识库 / 看板 / 弹层状态
-  const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [docs, setDocs] = useState<KnowledgeDoc[]>(MOCK_DOCS)
-  const [plan, setPlan] = useState<PlanCard[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string>()
-  const [toasts, setToasts] = useState<Toast[]>([])
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
   const [announceOpen, setAnnounceOpen] = useState(false)
   const [noticeOpen, setNoticeOpen] = useState(true)
-  const [creationConnections, setCreationConnections] = useState<Record<ToolId, ToolConn>>({
-    video: { toolId: 'video', status: 'starting' }, game: { toolId: 'game', status: 'starting' }, app: { toolId: 'app', status: 'starting' },
-  })
-  const [studioCards, setStudioCards] = useState<StudioCardModel[]>([])
-  const [inbox, setInbox] = useState<CreationInboxItem[]>([])
-  const [usage, setUsage] = useState<Usage[]>([])
-  const [toolTime, setToolTime] = useState<ToolTimeDay[]>([])
-  const toastSeq = useRef(0)
 
-  const pushToast = useCallback((t: Omit<Toast, 'id'>) => {
-    const id = ++toastSeq.current
-    setToasts((prev) => [...prev, { ...t, id }].slice(-4))
-    window.setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 4000)
-  }, [])
-  const dismissToast = (id: number) => setToasts((prev) => prev.filter((x) => x.id !== id))
+  // 使用提取的 hooks
+  const { toasts, pushToast, dismissToast } = useToast()
+  const {
+    jobs,
+    services,
+    projects,
+    plan,
+    announcements,
+    loading,
+    error,
+    refetch: loadData,
+    setJobs,
+    setServices,
+    setPlan,
+    setAnnouncements,
+  } = useWorkbenchData({ onDataLoaded })
+
+  const {
+    connections: creationConnections,
+    studioCards,
+    inbox,
+    usage,
+    toolTime,
+    setInbox,
+    setStudioCards,
+  } = useCreationTools(view)
+
   const closeConfirm = useCallback(() => setConfirm(null), [])
   const closeAnnounce = useCallback(() => setAnnounceOpen(false), [])
   const closeNotice = useCallback(() => setNoticeOpen(false), [])
-
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setError(undefined)
-    try {
-      const [tasksData, jobsData, modulesData, summaryData] = await Promise.all([
-        fetchTasks(),
-        fetchJobs(),
-        fetchModules(),
-        fetchWorkbenchSummary(),
-      ])
-      const nextJobs = jobsData.map(adaptJob)
-      setJobs(nextJobs)
-      setServices(modulesData.map(adaptModule))
-      setPlan(tasksData.map(adaptTask))
-      setProjects(aggregateProjects(tasksData, jobsData))
-      setAnnouncements(adaptWorkbenchSummaryToAnnouncements(summaryData))
-      setSelectedId((current) => current && nextJobs.some((job) => job.id === current) ? current : nextJobs[0]?.id)
-      onDataLoaded?.({ tasks: tasksData.length, jobs: jobsData.length, modules: modulesData.length })
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : '加载工作台数据失败，请重试'
-      setError(message)
-      pushToast({ tone: 'danger', title: '加载失败', description: message })
-    } finally {
-      setLoading(false)
-    }
-  }, [onDataLoaded, pushToast])
-
-  useEffect(() => {
-    void loadData()
-  }, [loadData])
-
-  useEffect(() => {
-    void Promise.all([fetchToolConnection('video'), fetchToolConnection('game'), fetchToolConnection('app')]).then((connections) => {
-      const mapped = connections.map((connection: ToolConnection) => [connection.toolId, {
-        ...connection,
-        status: connection.status === 'connecting' ? 'starting' : connection.status,
-      } satisfies ToolConn] as const)
-      setCreationConnections(Object.fromEntries(mapped) as Record<ToolId, ToolConn>)
-    }).catch(() => undefined)
-    void fetchInboxItems({ status: 'pending' }).then((items) => setInbox(items as CreationInboxItem[])).catch(() => undefined)
-    void fetchUsageRecords().then((items) => setUsage(items as Usage[])).catch(() => undefined)
-    void fetchToolTimeStats({ days: 7 }).then((items) => setToolTime(items as ToolTimeDay[])).catch(() => undefined)
-  }, [])
-
-  useEffect(() => {
-    if (view !== 'video' && view !== 'game' && view !== 'app') return
-    void fetchStudioCards(view).then((cards) => setStudioCards(cards as StudioCardModel[])).catch(() => setStudioCards([]))
-  }, [view])
 
   const togglePinAnnouncement = (id: string) => {
     const target = announcements.find((a) => a.id === id)
